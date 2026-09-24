@@ -1,5 +1,8 @@
 # Data Analyst Academy
 
+[![CI](https://github.com/eslamzyada/data-analyst-academy/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/eslamzyada/data-analyst-academy/actions/workflows/ci.yml)
+[![CD](https://github.com/eslamzyada/data-analyst-academy/actions/workflows/cd.yml/badge.svg)](https://github.com/eslamzyada/data-analyst-academy/actions/workflows/cd.yml)
+
 A personal, offline learning app for becoming a data analyst: **Excel, SQL, Power Query,
 Power BI and analyst thinking**. It runs on your own computer, in your browser, and keeps your
 progress on your computer only.
