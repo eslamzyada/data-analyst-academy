@@ -1,0 +1,9 @@
+#!/bin/sh
+# Refuses commits on main: every change starts on a feature branch (git switch -c claude/<topic> origin/main).
+# The learner's installed copy stays on main and only ever fast-forwards to origin/main.
+branch=$(git symbolic-ref --short -q HEAD)
+if [ "$branch" = "main" ]; then
+  echo "pre-commit: refusing to commit on main. Create a feature branch first: git switch -c claude/<topic> origin/main" >&2
+  exit 1
+fi
+exit 0
