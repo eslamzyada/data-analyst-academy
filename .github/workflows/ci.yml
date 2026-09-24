@@ -1,0 +1,154 @@
+name: CI
+
+# The safety gate for every pull request into main and every push to main.
+# The job names below (test, browser, build) are the status checks a pull request shows.
+# Everything runs on throw-away progress databases; learner progress is never in the repository.
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+  workflow_call: # the release workflow runs this whole gate on the tagged commit
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+defaults:
+  run:
+    working-directory: app
+
+jobs:
+  test:
+    name: test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: app/.nvmrc
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - name: Install (npm ci; package-lock.json is authoritative)
+        run: npm ci
+      - name: Type check
+        run: npm run typecheck
+      - name: Content validation
+        run: npm run validate
+      - name: Grading tests
+        run: npm run test:grading
+      - name: Mastery Layer tests
+        run: npm run test:mastery
+      - name: API end-to-end tests
+        run: npm run smoke
+      - name: Reproducibility (rebuild all practice data, compare every answer key)
+        run: npm run check:repro
+
+  browser:
+    name: browser
+    needs: test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: app/.nvmrc
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - name: Install (npm ci)
+        run: npm ci
+      - name: Build the client the browser tests load
+        run: npm run build
+      - name: Install Chrome (pinned, so every run uses the same browser)
+        id: chrome
+        uses: browser-actions/setup-chrome@48ad923757ca74d66703209fe939badbdf80f2f4 # v2.2.0
+        with:
+          chrome-version: 154.0.8037.57
+          install-dependencies: true
+      - name: Let Chrome use its sandbox on Ubuntu 24.04
+        # Ubuntu 24.04 blocks the unprivileged user namespaces Chrome's sandbox needs. Re-allowing
+        # them keeps the sandbox on (the tests do not pass --no-sandbox).
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - name: Browser tests (headless Chrome, throw-away progress, port 7798)
+        env:
+          ACADEMY_TEST_BROWSER: ${{ steps.chrome.outputs.chrome-path }}
+        run: |
+          "$ACADEMY_TEST_BROWSER" --version
+          npm run test:ui
+
+  build:
+    name: build
+    needs: test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: app/.nvmrc
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - name: Install (npm ci)
+        run: npm ci
+      - name: Production build
+        run: npm run build
+      - name: Plant private files the package must leave out
+        # Makes the privacy check below meaningful: these exist, and must not be packaged.
+        run: |
+          echo decoy > data/academy.db
+          echo decoy > data/academy.db.tmp
+          mkdir -p data/backups reports
+          echo decoy > data/backups/academy-old.db
+          echo decoy > reports/progress-report.md
+          echo SECRET=decoy > .env
+      - name: Package (allow-list, privacy check, app started from the zip)
+        run: npm run package
+      - name: The planted private files are not in the package
+        working-directory: release
+        run: |
+          unzip -l data-analyst-academy-*.zip > listing.txt
+          if grep -E "/app/data/academy\.db|/app/data/backups/|/app/\.env|/app/reports/" listing.txt; then
+            echo "::error::private files ended up in the package"
+            exit 1
+          fi
+          echo "None of the planted private files is in the package ($(grep -c ' ' listing.txt) lines listed)."
+
+  main-guard:
+    name: main-guard
+    # Detection for a repository whose plan cannot block direct pushes (see CONTRIBUTING.md):
+    # every commit that lands on main must belong to a merged pull request, or this run fails.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - name: Every change on main arrived through a merged pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BEFORE: ${{ github.event.before }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+            echo "First push to main: the repository was just created. Nothing to compare."
+            exit 0
+          fi
+          merged=$(gh api "repos/$GITHUB_REPOSITORY/commits/$SHA/pulls" \
+            --jq '[.[] | select(.merged_at != null and .base.ref == "main")] | map("#\(.number) \(.title)") | join(", ")')
+          if [ -n "$merged" ]; then
+            echo "main moved to $SHA through merged pull request $merged."
+            exit 0
+          fi
+          echo "::error::$SHA reached main without a merged pull request. main only changes through reviewed pull requests (CONTRIBUTING.md)."
+          exit 1
