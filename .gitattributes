@@ -1,0 +1,19 @@
+# Source and docs: LF in the repository and in every checkout, on every machine.
+* text=auto eol=lf
+
+# The Windows launcher: cmd.exe expects CRLF.
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+# Data assets are exact bytes. Some practice files use CRLF on purpose (they imitate messy
+# exports) and every answer key is computed from these files: git must never convert them.
+app/data/** -text
+app/seed/** -text
+
+# Binary files
+*.db binary
+*.xlsx binary
+*.zip binary
+*.ico binary
+*.png binary
+*.wasm binary

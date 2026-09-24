@@ -1,0 +1,44 @@
+{
+  "name": "data-analyst-academy",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Personal Data Analyst Academy - local learning app (Excel, SQL, Power Query, Power BI)",
+  "type": "module",
+  "scripts": {
+    "start": "node server/index.js --open",
+    "serve": "node server/index.js",
+    "dev:client": "vite --config client/vite.config.ts",
+    "build": "vite build --config client/vite.config.ts",
+    "build:data": "node tools/build-data.js",
+    "validate": "node tools/validate-content.js",
+    "test:grading": "node tools/test-grading.js",
+    "smoke": "node tools/smoke-test.js",
+    "test:ui": "node --experimental-websocket tools/test-ui.js",
+    "validate:coverage": "node tools/validate-content.js --coverage",
+    "test": "npm run validate && npm run test:grading && npm run test:mastery && npm run smoke && npm run test:ui",
+    "coverage": "node tools/coverage-report.js",
+    "fixture": "node tools/fixture.js",
+    "build:extra": "node tools/build-extra.js",
+    "test:mastery": "node tools/test-mastery.js"
+  },
+  "dependencies": {
+    "exceljs": "^4.4.0",
+    "express": "^4.22.3",
+    "hyperformula": "^3.4.0",
+    "jszip": "^3.10.2",
+    "sql.js": "^1.14.2"
+  },
+  "devDependencies": {
+    "@codemirror/lang-sql": "^6.10.0",
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
+    "@uiw/react-codemirror": "^4.25.11",
+    "@vitejs/plugin-react": "^4.7.0",
+    "marked": "^14.1.4",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.30.6",
+    "typescript": "^5.9.3",
+    "vite": "^5.4.21"
+  }
+}

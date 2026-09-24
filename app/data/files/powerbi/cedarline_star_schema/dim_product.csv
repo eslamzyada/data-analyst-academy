@@ -1,0 +1,62 @@
+product_id,sku,product_name,category,unit_cost,list_price,is_active
+1,TNT-100,Classic A-Frame Tent,Tents,91.1,159,0
+2,TNT-101,Ridgeline 1P Tent,Tents,112.15,189,1
+3,TNT-102,Ridgeline 2P Tent,Tents,151.02,249,1
+4,TNT-103,Basecamp 4P Dome Tent,Tents,197.3,329,1
+5,TNT-104,Basecamp 6P Cabin Tent,Tents,271.85,449,1
+6,TNT-105,Ultralight Trek Tarp,Tents,66.08,119,1
+7,TNT-106,Four-Season Summit Tent,Tents,326.41,599,1
+8,TNT-107,Family Screen Shelter,Tents,154.3,279,1
+9,TNT-108,Bivy Sack,Tents,83.8,139,1
+10,TNT-109,Ultralight 2P Trekking Tent,Tents,226.53,399,1
+11,SLP-201,Nightfall 30F Sleeping Bag,Sleeping Gear,71.96,129,1
+12,SLP-202,Nightfall 15F Sleeping Bag,Sleeping Gear,99.72,179,1
+13,SLP-203,Arctic 0F Down Sleeping Bag,Sleeping Gear,183.99,349,1
+14,SLP-204,Kids' Campfire Sleeping Bag,Sleeping Gear,32.21,59,1
+15,SLP-205,Self-Inflating Sleeping Pad,Sleeping Gear,52.73,89,1
+16,SLP-206,Foam Trail Pad,Sleeping Gear,19.34,34,1
+17,SLP-207,Camp Pillow,Sleeping Gear,13.21,24,1
+18,SLP-208,Double Air Mattress,Sleeping Gear,63.08,119,1
+19,BPK-301,Daytripper 22L Pack,Backpacks,36.54,69,1
+20,BPK-302,Trailhead 35L Pack,Backpacks,60.36,129,1
+21,BPK-303,Expedition 65L Pack,Backpacks,128.51,259,1
+22,BPK-304,Hydration Pack 3L,Backpacks,38.55,79,1
+23,BPK-305,Kids' Explorer Pack,Backpacks,19.59,39,1
+24,BPK-306,Travel Duffel 60L,Backpacks,45.79,99,1
+25,BPK-307,Hip Pack,Backpacks,14.23,29,1
+26,BPK-308,Trek 50L Pack,Backpacks,98.75,189,0
+27,FTW-401,Trailrunner Low Shoe,Footwear,81.17,139,1
+28,FTW-402,Summit Mid Hiking Boot,Footwear,103.52,189,1
+29,FTW-403,Alpine Leather Boot,Footwear,139.22,249,1
+30,FTW-404,Camp Sandal,Footwear,33.73,59,1
+31,FTW-405,Winter Insulated Boot,Footwear,114.42,219,1
+32,FTW-406,Approach Shoe,Footwear,89.18,159,1
+33,FTW-407,Kids' Hiking Boot,Footwear,45.81,79,1
+34,FTW-408,Water Shoe,Footwear,26.62,49,0
+35,APP-501,Storm Shell Rain Jacket,Apparel,76.98,169,1
+36,APP-502,Down Puffer Jacket,Apparel,92.92,229,1
+37,APP-503,Fleece Midlayer,Apparel,37.18,89,1
+38,APP-504,Merino Base Layer Top,Apparel,32.51,79,1
+39,APP-505,Convertible Hiking Pants,Apparel,28.79,69,1
+40,APP-506,Sun Hoodie,Apparel,19.94,49,1
+41,APP-507,Wool Hiking Socks 3-Pack,Apparel,12.31,29,1
+42,APP-508,Softshell Gloves,Apparel,15.02,39,1
+43,APP-509,Trail Cap,Apparel,9.95,24,1
+44,CKG-601,Compact Canister Stove,Cooking,25.32,49,1
+45,CKG-602,Two-Burner Camp Stove,Cooking,70.76,129,1
+46,CKG-603,Titanium Cook Pot 1L,Cooking,31.24,59,1
+47,CKG-604,Camp Cookset 4-Person,Cooking,46.03,89,1
+48,CKG-605,Insulated Camp Mug,Cooking,12.28,25,1
+49,CKG-606,Water Filter Bottle,Cooking,21.87,45,1
+50,CKG-607,Gravity Water Filter,Cooking,51.97,99,1
+51,CKG-608,Rolling Cooler 50QT,Cooking,86.69,159,1
+52,CKG-609,Pour-Over Coffee Kit,Cooking,18.34,35,1
+53,ACC-701,LED Headlamp 300lm,Accessories,15.85,39,1
+54,ACC-702,Rechargeable Lantern,Accessories,20.88,49,1
+55,ACC-703,Trekking Poles (Pair),Accessories,33.97,89,1
+56,ACC-704,Multi-Tool,Accessories,21.52,59,1
+57,ACC-705,First Aid Kit,Accessories,14.31,35,1
+58,ACC-706,Dry Bag 20L,Accessories,11.6,29,1
+59,ACC-707,Camp Chair,Accessories,25.3,69,1
+60,ACC-708,Solar Power Bank,Accessories,29.74,79,1
+61,ACC-709,Carabiner Set,Accessories,7.11,19,1

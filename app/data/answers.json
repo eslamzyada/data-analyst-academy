@@ -1,0 +1,1294 @@
+{
+ "xl-file-summit": [
+  750.2,
+  60,
+  12.5,
+  28.5,
+  11,
+  303.6
+ ],
+ "xl-file-supplier": [
+  3,
+  51331.07,
+  "Northline Supply",
+  50.93,
+  21
+ ],
+ "xl-file-regional": [
+  13154.86,
+  20,
+  245.38,
+  11685.87,
+  392,
+  "2026-01"
+ ],
+ "xl-file-ngo": [
+  141197.84,
+  "Clean Water",
+  260,
+  145,
+  15.73,
+  "Olivia Tanaka"
+ ],
+ "xl-file-trends": [
+  5,
+  "Foam Roller",
+  "P107",
+  4558520.98,
+  365271.14
+ ],
+ "xl-file-roster": [
+  140,
+  103,
+  43310,
+  5,
+  8
+ ],
+ "pq-file-contacts": [
+  230,
+  28,
+  5,
+  98,
+  16
+ ],
+ "pq-file-budget": [
+  84,
+  1519800,
+  "HR",
+  1038500
+ ],
+ "xl-file-cedarline-q2": [
+  2954,
+  55,
+  33,
+  347418.2,
+  5,
+  87.17
+ ],
+ "pq-file-pos": [
+  1183,
+  67158.55,
+  69462.1,
+  59971.55,
+  "W02",
+  76.1
+ ],
+ "pq-contacts-raw": [
+  239,
+  6
+ ],
+ "cap-retail": {
+  "westAttainment": 87.17,
+  "westGap": -13987.05,
+  "summit2025": 81215.95,
+  "summit2026": 56455.45,
+  "summitChangePct": -30.49,
+  "canyon2026": 54809.15,
+  "westInstoreGrowthPct": 37
+ },
+ "pbi-cedarline-pack": [
+  861604.8,
+  2053,
+  190.16,
+  24.73,
+  "Tents"
+ ],
+ "pq-file-primemeats": [
+  525,
+  44201.38,
+  22.68,
+  "Olive & Ember Riverside"
+ ],
+ "cap-restaurant": {
+  "foodCostBefore": 25.74,
+  "foodCostAfter": 28.05,
+  "byRestaurant": [
+   [
+    25.63,
+    27.1
+   ],
+   [
+    25.77,
+    28.19
+   ],
+   [
+    25.85,
+    29.02
+   ]
+  ],
+  "beefPct": 22.68,
+  "wasteJul": [
+   [
+    "Olive & Ember Airport",
+    2483.57
+   ],
+   [
+    "Olive & Ember Riverside",
+    1168.89
+   ],
+   [
+    "Olive & Ember Downtown",
+    966.56
+   ]
+  ],
+  "topWasteJul": "Olive & Ember Airport",
+  "riversideVsDowntownTomatoJul": 17.9,
+  "riversideTomatoNaive": 4.5,
+  "menuPriceChanges2026": 0
+ },
+ "cap-hr": {
+  "transportVol2023": 12.9,
+  "transportVol2025": 39.13,
+  "opsVol2025": 19.61,
+  "csVol2025": 41.11,
+  "topReasonTransport": "Workload/overtime",
+  "driverOT2025": 27.3,
+  "driverOT2024": 11
+ },
+ "cap-ngo": {
+  "total": 141197.84,
+  "topProgram": "Clean Water",
+  "donors": 260,
+  "gifts": 1144,
+  "recurringShare": 15.73,
+  "recurringDonors": 69,
+  "recurringDonorShare": 26.54,
+  "avgRecurringGift": 26.82,
+  "avgOneOffGift": 376.56,
+  "top10Share": 52.31,
+  "topDonor": "Olivia Tanaka",
+  "topDonorTotal": 15881.8,
+  "byProgram": [
+   [
+    "Clean Water",
+    38252.05
+   ],
+   [
+    "Food Security",
+    37699.02
+   ],
+   [
+    "Health",
+    36261.86
+   ],
+   [
+    "Education",
+    28984.91
+   ]
+  ],
+  "byChannel": [
+   [
+    "Online",
+    53888.44
+   ],
+   [
+    "Bank transfer",
+    48570.86
+   ],
+   [
+    "Event",
+    38738.54
+   ]
+  ],
+  "byRegion": [
+   [
+    "South Asia",
+    43650.38
+   ],
+   [
+    "Middle East",
+    41008.3
+   ],
+   [
+    "West Africa",
+    29825.57
+   ],
+   [
+    "East Africa",
+    26713.59
+   ]
+  ],
+  "byQuarter": [
+   [
+    "Q1",
+    28352.03
+   ],
+   [
+    "Q2",
+    37366.18
+   ],
+   [
+    "Q3",
+    45427.3
+   ],
+   [
+    "Q4",
+    30052.33
+   ]
+  ]
+ },
+ "cap-returns": {
+  "onlinePct": 10.34,
+  "inStorePct": 5.23,
+  "topCategory": "Footwear",
+  "topCategoryPct": 13.33,
+  "catRates": [
+   [
+    "Footwear",
+    13.33
+   ],
+   [
+    "Apparel",
+    10.55
+   ],
+   [
+    "Tents",
+    6.59
+   ],
+   [
+    "Sleeping Gear",
+    6.11
+   ],
+   [
+    "Backpacks",
+    5.09
+   ],
+   [
+    "Accessories",
+    3.35
+   ],
+   [
+    "Cooking",
+    2.12
+   ]
+  ],
+  "topReason": "Wrong size",
+  "topReasonShare": 36.02,
+  "wrongSizeCategories": [
+   "Apparel",
+   "Footwear"
+  ],
+  "onlineRefund": 105522,
+  "onlineRefundPctOfRevenue": 9.93,
+  "worstProduct": "Kids' Hiking Boot",
+  "worstProductPct": 16.3
+ },
+ "cap-retention": {
+  "lifetime": [
+   [
+    "2023",
+    415,
+    77.8
+   ],
+   [
+    "2024",
+    959,
+    74.1
+   ],
+   [
+    "2025",
+    1321,
+    64.5
+   ],
+   [
+    "2026",
+    1004,
+    33.4
+   ]
+  ],
+  "mature": [
+   [
+    "2024",
+    1279,
+    32.5
+   ],
+   [
+    "2025",
+    1340,
+    32.2
+   ],
+   [
+    "2026",
+    572,
+    34.1
+   ]
+  ],
+  "byChannel": [
+   [
+    "Referral",
+    390,
+    68.2
+   ],
+   [
+    "Not recorded",
+    201,
+    62.2
+   ],
+   [
+    "Organic Search",
+    1054,
+    59.5
+   ],
+   [
+    "In-Store",
+    1030,
+    58.8
+   ],
+   [
+    "Paid Social",
+    724,
+    58.7
+   ],
+   [
+    "Email",
+    300,
+    57.3
+   ]
+  ],
+  "naiveFirst": 77.8,
+  "naiveLast": 33.4,
+  "mature2024": 32.5,
+  "mature2026": 34.1,
+  "bestChannel": "Referral",
+  "bestChannelPct": 68.2,
+  "duplicateEmails": 68
+ },
+ "cap-waste": {
+  "bySite": [
+   [
+    "Olive & Ember Airport",
+    6645.64,
+    5.97
+   ],
+   [
+    "Olive & Ember Riverside",
+    3704.45,
+    2.58
+   ],
+   [
+    "Olive & Ember Downtown",
+    3143.99,
+    2.51
+   ]
+  ],
+  "byReason": [
+   [
+    "Expired",
+    9960
+   ],
+   [
+    "Over-prepared",
+    7615.44
+   ],
+   [
+    "Spoiled",
+    5346.67
+   ],
+   [
+    "Dropped/damaged",
+    1939.18
+   ],
+   [
+    "Equipment failure",
+    557.58
+   ]
+  ],
+  "byIngredient": [
+   [
+    "Mozzarella",
+    3364.25
+   ],
+   [
+    "Beef mince",
+    2789.08
+   ],
+   [
+    "Salmon fillet",
+    2535.42
+   ],
+   [
+    "Prawns",
+    1980.84
+   ],
+   [
+    "Tomatoes",
+    1801.78
+   ]
+  ],
+  "worstSite": "Olive & Ember Airport",
+  "worstSitePct": 5.97,
+  "bestSitePct": 2.51,
+  "topReason": "Expired",
+  "topReasonCost": 9960,
+  "topIngredient": "Mozzarella",
+  "equipmentFailureEvents": 7
+ },
+ "cap-supplier": {
+  "spend": [
+   [
+    "Prime Meats Co.",
+    277868.01
+   ],
+   [
+    "Dairy Valley",
+    182919.88
+   ],
+   [
+    "Harbor Seafood Traders",
+    129373.61
+   ],
+   [
+    "GreenLeaf Farms",
+    98509.32
+   ],
+   [
+    "Pantry Staples Ltd.",
+    94139.86
+   ],
+   [
+    "Bevco Distributors",
+    47038.08
+   ],
+   [
+    "QuickVeg Wholesale",
+    20319.45
+   ]
+  ],
+  "priceChange": [
+   [
+    "Prime Meats Co.",
+    12.7
+   ],
+   [
+    "Bevco Distributors",
+    0.6
+   ],
+   [
+    "Harbor Seafood Traders",
+    0.5
+   ],
+   [
+    "Dairy Valley",
+    0.4
+   ],
+   [
+    "Pantry Staples Ltd.",
+    0.2
+   ],
+   [
+    "GreenLeaf Farms",
+    0.1
+   ]
+  ],
+  "quickVegPremiumPct": 17.9,
+  "topSupplier": "Prime Meats Co.",
+  "topSupplierSpend": 277868.01,
+  "topSupplierShare": 32.68,
+  "biggestRiser": "Prime Meats Co.",
+  "biggestRiserPct": 12.7,
+  "quickVegSpend": 20319.45
+ },
+ "cap-sales": {
+  "bySite": [
+   [
+    "Olive & Ember Airport",
+    899962.7,
+    12.11,
+    8.71
+   ],
+   [
+    "Olive & Ember Riverside",
+    1054244.98,
+    9.98,
+    5.36
+   ],
+   [
+    "Olive & Ember Downtown",
+    1217221.06,
+    9.12,
+    5.12
+   ]
+  ],
+  "byDish": [
+   [
+    "Ember Burger",
+    257150.7,
+    8.11
+   ],
+   [
+    "Pepperoni Pizza",
+    202374.06,
+    6.38
+   ],
+   [
+    "Margherita Pizza",
+    200675.06,
+    6.33
+   ],
+   [
+    "Ribeye Steak",
+    189003.72,
+    5.96
+   ],
+   [
+    "Grilled Salmon",
+    182711.2,
+    5.76
+   ]
+  ],
+  "byCategory": [
+   [
+    "Mains",
+    1339704.58,
+    42.24,
+    60296
+   ],
+   [
+    "Pizza",
+    640965.49,
+    20.21,
+    41265
+   ],
+   [
+    "Starters",
+    389940.7,
+    12.3,
+    40414
+   ],
+   [
+    "Drinks",
+    371137.93,
+    11.7,
+    90960
+   ],
+   [
+    "Desserts",
+    262703.5,
+    8.28,
+    28233
+   ],
+   [
+    "Sides",
+    166976.54,
+    5.27,
+    34048
+   ]
+  ],
+  "byMonth": [
+   [
+    "2026-07",
+    465749.66
+   ],
+   [
+    "2026-08",
+    440675.87
+   ],
+   [
+    "2026-06",
+    427432.42
+   ],
+   [
+    "2026-05",
+    423273.69
+   ],
+   [
+    "2026-04",
+    382142.09
+   ],
+   [
+    "2026-03",
+    370035.81
+   ],
+   [
+    "2026-01",
+    349360.47
+   ],
+   [
+    "2026-02",
+    312758.73
+   ]
+  ],
+  "sales25": 2876810.06,
+  "sales26": 3171428.74,
+  "growthPct": 10.24,
+  "qty25": 277883,
+  "qty26": 295216,
+  "qtyGrowthPct": 6.24,
+  "bestSite": "Olive & Ember Airport",
+  "bestSiteGrowthPct": 12.11,
+  "bestSiteQtyGrowthPct": 8.71,
+  "topDish": "Ember Burger",
+  "topDishSales": 257150.7,
+  "topDishSharePct": 8.11,
+  "topCategory": "Mains",
+  "topCategorySharePct": 42.24,
+  "mostUnitsCategory": "Drinks",
+  "mostUnitsCategoryUnits": 90960,
+  "mostUnitsCategorySharePct": 11.7,
+  "peakMonth": "2026-07",
+  "peakMonthSales": 465749.66,
+  "troughMonth": "2026-02",
+  "troughMonthSales": 312758.73,
+  "priceRisePct": 4.07
+ },
+ "cap-profit": {
+  "pl": [
+   [
+    "Olive & Ember Riverside",
+    1054244.98,
+    283835.36,
+    284405.17,
+    128358.99,
+    357645.46,
+    33.92,
+    88000,
+    8.35,
+    26.98,
+    188514.99,
+    363887.54
+   ],
+   [
+    "Olive & Ember Downtown",
+    1217221.06,
+    318741.98,
+    316576.87,
+    172576.38,
+    409325.83,
+    33.63,
+    128000,
+    10.52,
+    26.01,
+    232732.38,
+    441216.62
+   ],
+   [
+    "Olive & Ember Airport",
+    899962.7,
+    244505.7,
+    263543.22,
+    184930.6,
+    206983.18,
+    23,
+    143997.03,
+    16,
+    29.28,
+    245086.6,
+    487908.74
+   ]
+  ],
+  "worstSite": "Olive & Ember Airport",
+  "worstSales": 899962.7,
+  "worstProfit": 206983.18,
+  "worstMargin": 23,
+  "worstRent": 143997.03,
+  "worstRentPct": 16,
+  "worstLabourPct": 29.28,
+  "worstBreakEven": 487908.74,
+  "worstTimesOverBreakEven": 1.84,
+  "cheapestRentSite": "Olive & Ember Riverside",
+  "cheapestRent": 88000,
+  "cheapestRentPct": 8.35,
+  "profitOnCheapRent": 262980.21,
+  "marginOnCheapRent": 29.22,
+  "groupProfit": 973954.47,
+  "bestMargin": 33.92,
+  "bestSite": "Olive & Ember Riverside"
+ },
+ "pbi-intro-look": [
+  18791,
+  61,
+  6
+ ],
+ "pbi-import-check": [
+  2128722.45,
+  792,
+  75
+ ],
+ "pbi-pq-shape": [
+  7645,
+  6583,
+  4196
+ ],
+ "pbi-pq-products": [
+  58,
+  "Tents",
+  305.67
+ ],
+ "pbi-pq-price": [
+  0,
+  5640
+ ],
+ "pbi-model-relate": [
+  177010.35,
+  122034.85,
+  433610.05
+ ],
+ "pbi-model-region": [
+  238294.45,
+  32778.9
+ ],
+ "pbi-model-channel": [
+  "Referral",
+  500.96,
+  44682.15
+ ],
+ "pbi-star-orphans": [
+  3,
+  874,
+  57
+ ],
+ "pbi-date-build": [
+  1096,
+  120738.4,
+  28.28
+ ],
+ "pbi-date-periods": [
+  210269,
+  "July",
+  900057.75
+ ],
+ "pbi-date-gaps": [
+  13937.2,
+  38.18,
+  114.24
+ ],
+ "pbi-vis-overview": [
+  "Cooking",
+  "Riverside",
+  117195.65
+ ],
+ "pbi-vis-slicers": [
+  48983.3,
+  15440.95
+ ],
+ "pbi-vis-page": [
+  "July",
+  48.87,
+  "Accessories"
+ ],
+ "pbi-rep-kpis": [
+  113659.15,
+  636,
+  178.71,
+  20.74
+ ],
+ "pbi-dax-core": [
+  496459.3,
+  2673,
+  185.73,
+  1277
+ ],
+ "pbi-dax-margin": [
+  456597.91,
+  405006.89,
+  47.01
+ ],
+ "pbi-dax-discount": [
+  890898,
+  29293.2,
+  3.29
+ ],
+ "pbi-dax-basket": [
+  2.15,
+  1.69,
+  44.8
+ ],
+ "pbi-ctx-customers": [
+  1366,
+  1228,
+  2053
+ ],
+ "pbi-ctx-rowctx": [
+  894316,
+  32711.2
+ ],
+ "pbi-ctx-aov": [
+  190.16,
+  187.71,
+  192.7
+ ],
+ "pbi-calc-channel": [
+  433610.05,
+  50.33,
+  50.98
+ ],
+ "pbi-calc-category": [
+  22.67,
+  20.35
+ ],
+ "pbi-calc-active": [
+  743325.45,
+  3.55
+ ],
+ "pbi-calc-west": [
+  55265.3,
+  28.11,
+  46.91
+ ],
+ "pbi-time-ytd": [
+  770658.35,
+  594189.95,
+  29.7
+ ],
+ "pbi-time-mtd": [
+  52753.55,
+  48872.9,
+  382198.35
+ ],
+ "pbi-time-lfl": [
+  32.14,
+  13.76
+ ],
+ "pbi-rank-top": [
+  "Four-Season Summit Tent",
+  42474.9,
+  14
+ ],
+ "pbi-rank-cat": [
+  "Trailrunner Low Shoe",
+  20.29
+ ],
+ "pbi-rank-stores": [
+  "Northgate",
+  "Canyon",
+  16
+ ],
+ "pbi-an-target": [
+  203000,
+  196592.2,
+  96.84,
+  "Canyon"
+ ],
+ "pbi-an-growth": [
+  176468.4,
+  "Footwear",
+  42685.55
+ ],
+ "think-q-dupes": [
+  139,
+  68,
+  71
+ ],
+ "think-q-dates": [
+  6,
+  6,
+  512
+ ],
+ "think-q-missing": [
+  250,
+  5.47,
+  44682.15
+ ],
+ "think-q-salary": [
+  5,
+  5,
+  5112
+ ],
+ "think-avg-refund": [
+  108.68,
+  75,
+  209
+ ],
+ "think-avg-salary": [
+  489,
+  46019.84,
+  41800,
+  13
+ ],
+ "think-avg-price": [
+  10.86,
+  10.9,
+  "Olive & Ember Riverside"
+ ],
+ "think-int-weekday": [
+  6599.9,
+  3804.15,
+  73.49
+ ],
+ "think-int-season": [
+  99173.13,
+  -13.8,
+  12.77
+ ],
+ "think-cause-discount": [
+  10799.25,
+  16429.45,
+  2.15,
+  0.99
+ ],
+ "think-def-revenue": [
+  861604.8,
+  893059.35,
+  66181.4,
+  795423.4
+ ],
+ "think-def-headcount": [
+  488,
+  486.25,
+  131,
+  26.94
+ ],
+ "think-def-customers": [
+  4571,
+  4500,
+  2055
+ ],
+ "think-kpi-returns": [
+  10.66,
+  4.67,
+  10.71
+ ],
+ "think-kpi-labour": [
+  26.36,
+  28.2,
+  "Olive & Ember Airport"
+ ],
+ "think-val-fanout": [
+  4533,
+  7645,
+  7446.68,
+  8285.63
+ ],
+ "think-val-returns": [
+  1466,
+  1429,
+  37
+ ],
+ "pq-swift-combine": [
+  1404,
+  181062,
+  "Easton",
+  7.42,
+  93.47
+ ],
+ "pq-swift-param": [
+  921,
+  118165,
+  95.66
+ ],
+ "pq-swift-score": [
+  "Hana Sato",
+  5.56,
+  "Metro",
+  9038
+ ],
+ "pq-swift-fuel": [
+  37,
+  14.57,
+  12.29
+ ],
+ "pq-swift-km": [
+  146809.61,
+  40610.51,
+  104.57
+ ],
+ "cap-swiftline": {
+  "byDepot": {
+   "Harbor City": {
+    "runs": 467,
+    "parcels": 73149,
+    "delivered": 70493,
+    "onTimePct": 94.52,
+    "failedPct": 3.63,
+    "km": 41823.9,
+    "kmPerParcel": 0.57,
+    "parcelsPerRun": 156.64
+   },
+   "Bayport": {
+    "runs": 313,
+    "parcels": 38921,
+    "delivered": 36995,
+    "onTimePct": 91.55,
+    "failedPct": 4.95,
+    "km": 34485.4,
+    "kmPerParcel": 0.89,
+    "parcelsPerRun": 124.35
+   },
+   "Marlow": {
+    "runs": 390,
+    "parcels": 57812,
+    "delivered": 56040,
+    "onTimePct": 95.67,
+    "failedPct": 3.07,
+    "km": 29889.8,
+    "kmPerParcel": 0.52,
+    "parcelsPerRun": 148.24
+   },
+   "Easton": {
+    "runs": 234,
+    "parcels": 18940,
+    "delivered": 17534,
+    "onTimePct": 86.25,
+    "failedPct": 7.42,
+    "km": 40610.51,
+    "kmPerParcel": 2.14,
+    "parcelsPerRun": 80.94
+   }
+  },
+  "group": {
+   "runs": 1404,
+   "parcels": 188822,
+   "delivered": 181062,
+   "onTimePct": 93.47,
+   "failedPct": 4.11,
+   "km": 146809.61,
+   "kmPerParcel": 0.78,
+   "parcelsPerRun": 134.49
+  },
+  "worstOnTime": "Easton",
+  "worstOnTimePct": 86.25,
+  "worstKmPerParcel": 2.14,
+  "worstParcelsPerRun": 80.94,
+  "densest": "Marlow",
+  "densestKmPerParcel": 0.52,
+  "densestParcelsPerRun": 148.24,
+  "onTimePctExcludingWorst": 94.24,
+  "footerRowsDropped": 1,
+  "missingFuelRuns": 37
+ },
+ "pq-hp-append": [
+  815,
+  73363.27,
+  3779,
+  4.95
+ ],
+ "pq-hp-merge": [
+  19160.82,
+  2745.92,
+  3
+ ],
+ "pq-hp-tiers": [
+  5,
+  2,
+  28924.6
+ ],
+ "pq-hp-names": [
+  6,
+  5,
+  7169.98
+ ],
+ "cap-marketing": {
+  "channels": {
+   "Search": {
+    "spend": 51456.53,
+    "value": 290423.13,
+    "roas": 5.64
+   },
+   "Social": {
+    "spend": 19160.82,
+    "value": 69303.77,
+    "roas": 3.62
+   }
+  },
+  "searchRoas": 5.64,
+  "socialRoas": 3.62,
+  "searchSpend": 51456.53,
+  "socialSpend": 19160.82,
+  "worstCampaign": "HP-F04",
+  "worstCampaignRoas": 0.44,
+  "worstCampaignObjective": "Awareness",
+  "awarenessSpend": 8644.35,
+  "awarenessValue": 5987.23,
+  "overBudgetCount": 3,
+  "worstOverCampaign": "HP-S02",
+  "worstOverAmount": 992.7,
+  "unregisteredSpend": 2745.92,
+  "neverRanCount": 1,
+  "neverRanBudget": 2500,
+  "totalSpend": 73363.27,
+  "totalValue": 363124.94
+ },
+ "pq-bw-unpivot": [
+  197,
+  8295,
+  72.28
+ ],
+ "pq-bw-regions": [
+  "Highlands",
+  17.92,
+  1
+ ],
+ "pq-pos-july": [
+  400,
+  124,
+  265,
+  69462.1,
+  713
+ ],
+ "pq-pos-reconcile": [
+  2041,
+  35,
+  40914.95,
+  "Tents",
+  6
+ ],
+ "pq-crm-split": [
+  11,
+  23,
+  46
+ ],
+ "pq-crm-campaign": [
+  112,
+  "Bayport",
+  48.7
+ ],
+ "pq-roster": [
+  145,
+  19,
+  37,
+  6063400,
+  27
+ ],
+ "pq-rest-discounts": [
+  463,
+  55827.66,
+  30.02
+ ],
+ "pq-recipe-cost": [
+  "Ribeye Steak",
+  15.93,
+  45.86,
+  3
+ ],
+ "pq-pm-audit": [
+  2,
+  5511.92,
+  22.44
+ ],
+ "pq-pm-function": [
+  921.2,
+  "2026-07",
+  22.03
+ ],
+ "xl-hp-daily": [
+  2.41,
+  11,
+  "2026-02-11",
+  "2026-06-15"
+ ],
+ "xl-hp-context": [
+  "2026-03-19",
+  1421.7,
+  7,
+  6,
+  1612539.13
+ ],
+ "xl-regional-sort": [
+  1822.31,
+  "ORD-50844",
+  31,
+  14922.63,
+  20
+ ],
+ "xl-regional-pivot": [
+  "South",
+  46.81,
+  78060.74
+ ],
+ "xl-search-pivot": [
+  17999.97,
+  "Brand Search",
+  15.49
+ ],
+ "xl-airport-monday": [
+  125979.67,
+  28477.32,
+  -24434.14
+ ],
+ "ra-dairy": {
+  "month": "2026-05",
+  "supplier": "Dairy Valley",
+  "risePct": 8.32,
+  "extraMayAug": 8364.71,
+  "spendMayAug": 105705.82
+ },
+ "ra-portion": {
+  "summer": {
+   "Olive & Ember Airport": 6.03,
+   "Olive & Ember Downtown": 1.51,
+   "Olive & Ember Riverside": 2.03
+  },
+  "spring": {
+   "Olive & Ember Airport": 3.01,
+   "Olive & Ember Downtown": 1.48,
+   "Olive & Ember Riverside": 2.02
+  },
+  "worst": "Olive & Ember Airport",
+  "apSummer": 6.03,
+  "apSpring": 3.01,
+  "dtSummer": 1.51
+ },
+ "ra-monday": {
+  "aug26": 440675.87,
+  "aug25": 402289.68,
+  "yoyPct": 9.54,
+  "foodPct": 28.09,
+  "labourPct": 26.65
+ },
+ "ra-invoices": {
+  "statement": 158670.62,
+  "books": 158572.61,
+  "difference": 98.01,
+  "dupInvoice": "PM-20260806-DT",
+  "dupCount": 1
+ },
+ "ra-two-revenues": {
+  "opsFigure": 189534.3,
+  "financeFigure": 156304.9,
+  "gap": 33229.4,
+  "cancelled": 12814.2,
+  "discount": 4805.65,
+  "refunds": 15609.55
+ },
+ "ra-absence": {
+  "all2024": 4.3,
+  "all2026": 5.26,
+  "transport2026": 7.49,
+  "others2026": 4.35,
+  "hubsOthers2026": 4.36,
+  "headOffice2026": 4.3,
+  "byLocation": {
+   "Head Office": 4.3,
+   "North Hub": 5.45,
+   "South Hub": 5.46
+  },
+  "transport2024": 4.25
+ },
+ "ra-programme": {
+  "villages": 36,
+  "both": 28,
+  "rate2024": 63.73,
+  "rate2026": 73.22,
+  "noBefore": 8,
+  "joined2026": 8
+ },
+ "ax-fieldhouse": {
+  "rows": 1810,
+  "members": 1786,
+  "duplicates": 14,
+  "tests": 6,
+  "blank": 3,
+  "footer": 1,
+  "active0331": 1174,
+  "active0831": 1228,
+  "change": {
+   "Northgate": 39,
+   "Riverside": -21,
+   "Old Town": 36
+  },
+  "lostClub": "Riverside",
+  "lostN": 21,
+  "rsCancelBefore": 34,
+  "rsCancelAfter": 106,
+  "rsMonthlyAfter": 82
+ },
+ "ax-cedarline": {
+  "truthLines": 2954,
+  "completedNet": 347418.2,
+  "overstatement": 51791.85,
+  "priceRows": 5,
+  "duplicateRows": 14,
+  "westAttainment": 87.17,
+  "naiveTotal": 366378.1
+ }
+}

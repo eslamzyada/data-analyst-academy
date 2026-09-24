@@ -1,0 +1,240 @@
+Customer ID,Full Name,Email,Phone,City,Signup Date
+CU-2000,"Sato, Irene",irene.sato@mail.example,0428 299 4190,REDWOOD FALLS,24/12/2025
+CU-2001,"Stone, Kate",kate.stone@mail.example,09393675373,Bayport,2025-01-03
+CU-2002,"Chen, Anna",anna.chen@mail.example,08266629591,Marlow,2024-08-23
+CU-2003,"Wright, Jamal",jamal.wright@mail.example,04753068755,Easton,2024-03-25
+CU-2004,"Chen, Ben",,03493074704,Marlow,14/01/2025
+CU-2005,"Mills, Anna",N/A,0873 326 0382,Bayport,2024-05-05
+CU-2006,"Hale, Paul",paul.hale@mail.example,01748843952,EASTON,2025-10-24
+CU-2007,"Sato, Victor",victor.sato@mail.example,06415649441, Easton,2026-03-14
+CU-2008,"Wright, Olga",olga.wright@mail.example,+444928163550,Redwood Falls,21/01/2024
+CU-2009,"Chen, Irene",N/A,07526812918,harbor city,2025-10-25
+CU-2010,"Wright, Farid",farid.wright@mail.example,0923 903 3366,Easton,2024-11-28
+CU-2011,"Nasser, Sami",sami.nasser@mail.example,08706710410,Bayport,2024-03-09
+CU-2012,"Lam, Gloria",gloria.lam@mail.example,01463683884,MARLOW,17/04/2025
+CU-2013,"Frost, Anna",N/A,07784903511,Redwood Falls,2025-09-16
+CU-2014,"Frost, Leon",,09825212450, Redwood Falls,2025-07-06
+CU-2015,"Sato, Kate",kate.sato@mail.example,0942 818 8097,Harbor City,2025-01-12
+CU-2016,"Price, David",david.price@mail.example,+446368078062,Harbor City,13/01/2025
+CU-2017,"Price, Sami",sami.price@mail.example,01615553542,Redwood Falls,2025-04-01
+CU-2018,"Frost, Paul",paul.frost@mail.example,04909978595,REDWOOD FALLS,2026-05-01
+CU-2019,"Stone, Rita",N/A,04951215505,Harbor City,2025-11-09
+CU-2020,"Lam, Leon",leon.lam@mail.example,0910 919 5909,Marlow,17/12/2024
+CU-2020,"Lam, Leon",leon.lam@mail.example,0910 919 5909,Marlow,17/12/2024
+CU-2021,"Sato, David",david.sato@mail.example,01088104774, Marlow,2025-09-02
+CU-2022,"Price, Leon",leon.price@mail.example,02859560808,Harbor City,2025-02-20
+CU-2023,"Berg, Sami",sami.berg@mail.example,01342175205,Redwood Falls,2024-07-19
+CU-2024,"Frost, David",david.frost@mail.example,+444419317380,MARLOW,10/11/2024
+CU-2025,"Nasser, Victor",victor.nasser@mail.example,0508 556 1408,Marlow,2024-03-12
+CU-2026,"Lam, Irene",irene.lam@mail.example,03706583941,Easton,2025-10-16
+CU-2027,"Berg, Hiro",hiro.berg@mail.example,06565357421,harbor city,2026-05-30
+CU-2028,"Chen, Rita",rita.chen@mail.example,04033861277, Bayport,11/11/2025
+CU-2029,"Lam, Nate",nate.lam@mail.example,04431601776,Harbor City,2025-01-13
+CU-2030,"Stone, Eva",eva.stone@mail.example,0270 114 2412,EASTON,2025-03-13
+CU-2031,"Lam, David",david.lam@mail.example,09862928579,Harbor City,2026-04-04
+,,,,,
+CU-2032,"Sato, Carla",,+443189497944,Redwood Falls,29/09/2024
+CU-2033,"Duarte, Anna",anna.duarte@mail.example,05304864244,Harbor City,2024-05-11
+CU-2034,"Nasser, Tess",tess.nasser@mail.example,05624808040,Easton,2024-08-22
+CU-2035,"Wright, Leon",leon.wright@mail.example,0863 959 0775, Marlow,2024-08-30
+CU-2036,"Sato, Tess",tess.sato@mail.example,08339102239,REDWOOD FALLS,14/02/2024
+CU-2037,"Stone, Ben",ben.stone@mail.example,01561359034,Redwood Falls,2025-08-30
+CU-2038,"Frost, Mona",mona.frost@mail.example,08722132595,Redwood Falls,2025-11-17
+CU-2039,"Duarte, Eva",eva.duarte@mail.example,02633841725,Easton,2024-09-21
+CU-2040,"Lam, Kate",kate.lam@mail.example,0260 971 3194,Marlow,09/01/2025
+CU-2041,"Lam, Rita",rita.lam@mail.example,09089090019,Harbor City,2026-03-04
+CU-2042,"Nasser, Anna",anna.nasser@mail.example,07221086378,REDWOOD FALLS,2025-06-17
+CU-2043,"Hale, Carla",carla.hale@mail.example,02647116700,Harbor City,2026-05-04
+CU-2044,"Okafor, Carla",carla.okafor@mail.example,01145356161,Marlow,19/05/2024
+CU-2045,"Okafor, Sami",sami.okafor@mail.example,0706 706 6850,harbor city,2024-08-26
+CU-2046,"Price, Mona",mona.price@mail.example,01996515099,Easton,2025-05-31
+CU-2047,"Berg, Kate",kate.berg@mail.example,04051653439,Marlow,2025-03-04
+CU-2048,"Berg, Victor",victor.berg@mail.example,+448911538327,HARBOR CITY,02/03/2024
+CU-2049,"Duarte, Farid",farid.duarte@mail.example,09853506578, Redwood Falls,2025-03-03
+CU-2050,"Lam, Ben",ben.lam@mail.example,0780 703 5699,Bayport,2025-02-11
+CU-2051,"Mills, Rita",rita.mills@mail.example,09887046902,Easton,2025-10-08
+CU-2052,"Mills, Paul",paul.mills@mail.example,01765113471,Harbor City,16/09/2024
+CU-2053,"Okafor, Jamal",jamal.okafor@mail.example,08247829767,Harbor City,2025-02-27
+CU-2054,"Okafor, Irene",irene.okafor@mail.example,08438610544,EASTON,2024-02-26
+CU-2054,"Okafor, Irene",irene.okafor@mail.example,08438610544,EASTON,2024-02-26
+CU-2055,"Stone, Mona",N/A,0469 726 8509,Bayport,2024-08-04
+CU-2056,"Kaur, Farid",farid.kaur@mail.example,+444124082868, Bayport,04/07/2025
+CU-2057,"Chen, Eva",eva.chen@mail.example,01221520406,Harbor City,2024-10-27
+CU-2058,"Mills, Ben",ben.mills@mail.example,08424934943,Harbor City,2025-02-22
+CU-2059,"Rivera, Ben",ben.rivera@mail.example,06665077915,Redwood Falls,2024-06-19
+CU-2060,"Lam, Eva",eva.lam@mail.example,0429 808 4037,EASTON,18/01/2024
+CU-2061,"Mills, Irene",N/A,01799328254,Harbor City,2024-02-13
+CU-2062,"Duarte, Jamal",jamal.duarte@mail.example,02867542721,Bayport,2025-04-12
+CU-2063,"Okafor, David",david.okafor@mail.example,09642923841, Marlow,2025-07-22
+CU-2064,"Duarte, Leon",,+443942087466,Easton,14/04/2025
+CU-2065,"Hale, Olga",olga.hale@mail.example,0219 674 2611,Bayport,2025-03-09
+CU-2066,"Rivera, Hiro",hiro.rivera@mail.example,06892693830,BAYPORT,2024-01-25
+CU-2067,"Okafor, Farid",farid.okafor@mail.example,09213046166,Bayport,2025-04-12
+CU-2068,"Hale, Rita",rita.hale@mail.example,09794045032,Harbor City,01/01/2024
+CU-2069,"Kaur, Leon",leon.kaur@mail.example,09679181992,Redwood Falls,2025-10-28
+CU-2070,"Hale, Leon",leon.hale@mail.example,0113 704 3872, Marlow,2024-10-18
+CU-2071,"Berg, Mona",N/A,05546678695,Easton,2025-05-16
+CU-2072,"Wright, Eva",eva.wright@mail.example,+443813977372,MARLOW,16/04/2025
+CU-2073,"Chen, Carla",carla.chen@mail.example,02412371410,Redwood Falls,2025-08-16
+CU-2074,"Hale, Gloria",gloria.hale@mail.example,01936302172,Harbor City,2024-03-25
+CU-2075,"Stone, Victor",N/A,0981 390 8482,Bayport,2025-10-06
+CU-2076,"Hale, Jamal",jamal.hale@mail.example,07537280315,Harbor City,13/03/2024
+CU-2077,"Mills, Mona",mona.mills@mail.example,08162081968, Easton,2024-02-29
+CU-2078,"Berg, Gloria",gloria.berg@mail.example,02797771543,MARLOW,2025-09-12
+CU-2079,"Rivera, Mona",mona.rivera@mail.example,09799116924,Redwood Falls,2024-07-16
+CU-2080,"Wright, David",david.wright@mail.example,0372 809 1634,Harbor City,22/05/2024
+CU-2081,"Price, Ben",ben.price@mail.example,08115416756,bayport,2024-04-26
+CU-2082,"Mills, Eva",eva.mills@mail.example,06027098702,Harbor City,2025-05-10
+CU-2083,"Chen, Nate",nate.chen@mail.example,01258093637,Easton,2024-10-10
+CU-2084,"Wright, Rita",rita.wright@mail.example,08624294616,HARBOR CITY,26/08/2025
+CU-2085,"Nasser, Farid",farid.nasser@mail.example,0287 353 0518,Bayport,2024-03-25
+CU-2086,"Okafor, Victor",victor.okafor@mail.example,08937507548,Marlow,2025-06-20
+CU-2087,"Lam, Tess",tess.lam@mail.example,07109986030,Marlow,2025-06-06
+CU-2088,"Stone, Jamal",jamal.stone@mail.example,+443465392478,Redwood Falls,25/08/2025
+CU-2088,"Stone, Jamal",jamal.stone@mail.example,+443465392478,Redwood Falls,25/08/2025
+CU-2089,"Duarte, Paul",paul.duarte@mail.example,07608363896,Marlow,2025-02-07
+CU-2090,"Kaur, Rita",rita.kaur@mail.example,0191 533 2804,BAYPORT,2025-10-02
+CU-2091,"Duarte, Mona",mona.duarte@mail.example,03117643874, Harbor City,2025-01-22
+CU-2092,"Rivera, Victor",victor.rivera@mail.example,05633208428,Bayport,28/05/2024
+CU-2093,"Rivera, Tess",N/A,05015143252,Redwood Falls,2024-05-22
+CU-2094,"Frost, Ben",ben.frost@mail.example,05157000436,Easton,2024-01-03
+CU-2095,"Sato, Farid",farid.sato@mail.example,0170 235 9202,Harbor City,2025-07-01
+CU-2096,"Price, Nate",nate.price@mail.example,+448019124098,HARBOR CITY,12/12/2025
+CU-2097,"Rivera, Carla",N/A,04094162178,Redwood Falls,2025-12-27
+CU-2098,"Nasser, Ben",ben.nasser@mail.example,09244232801, Easton,2026-04-07
+CU-2099,"Berg, Carla",carla.berg@mail.example,04719189498,bayport,2024-01-24
+CU-2100,"Berg, Rita",rita.berg@mail.example,0754 978 7231,Easton,18/06/2024
+CU-2101,"Berg, Paul",paul.berg@mail.example,05579646587,Easton,2025-06-27
+CU-2102,"Stone, Leon",leon.stone@mail.example,09241972396,EASTON,2024-11-23
+CU-2103,"Stone, Nate",nate.stone@mail.example,09314520056,Harbor City,2024-07-02
+CU-2104,"Chen, Jamal",jamal.chen@mail.example,+444048548044,Bayport,04/09/2024
+CU-2105,"Rivera, Rita",rita.rivera@mail.example,0229 398 3112, Harbor City,2025-04-19
+CU-2106,"Berg, Leon",leon.berg@mail.example,07006561850,Redwood Falls,2025-12-03
+CU-2107,"Sato, Eva",eva.sato@mail.example,03286802346,Easton,2025-01-27
+CU-2108,"Mills, Jamal",jamal.mills@mail.example,01092955274,HARBOR CITY,15/07/2024
+CU-2109,"Price, Paul",paul.price@mail.example,01391281996,Redwood Falls,2025-07-29
+CU-2110,"Nasser, Carla",carla.nasser@mail.example,0159 278 6237,Bayport,2024-11-12
+CU-2111,"Chen, Farid",farid.chen@mail.example,08885375667,Easton,2025-07-13
+CU-2112,"Duarte, Victor",victor.duarte@mail.example,+443947402796, Bayport,21/07/2025
+CU-2113,"Rivera, Sami",sami.rivera@mail.example,09512531575,Marlow,2025-08-12
+CU-2114,"Hale, Nate",nate.hale@mail.example,08471097080,MARLOW,2024-07-24
+CU-2115,"Sato, Sami",sami.sato@mail.example,0892 409 9494,Redwood Falls,2025-06-02
+,,,,,
+CU-2116,"Stone, Tess",tess.stone@mail.example,04687589233,Easton,26/09/2024
+CU-2117,"Sato, Gloria",gloria.sato@mail.example,05598602581,harbor city,2024-01-09
+CU-2118,"Rivera, Paul",paul.rivera@mail.example,04203420946,Bayport,2025-07-29
+CU-2119,"Okafor, Eva",eva.okafor@mail.example,07579161813, Bayport,2026-04-17
+CU-2120,"Stone, David",david.stone@mail.example,0758 608 7900,MARLOW,06/09/2024
+CU-2121,"Chen, Sami",sami.chen@mail.example,04902446121,Marlow,2026-05-02
+CU-2122,"Price, Tess",tess.price@mail.example,01464977481,Harbor City,2024-06-16
+CU-2123,"Chen, Victor",victor.chen@mail.example,07871301006,Bayport,2024-02-05
+CU-2124,"Duarte, David",david.duarte@mail.example,01372896810,Marlow,27/04/2024
+CU-2125,"Nasser, Olga",olga.nasser@mail.example,0296 283 9341,Redwood Falls,2024-05-27
+CU-2126,"Okafor, Rita",rita.okafor@mail.example,05366954990,EASTON,2025-07-14
+CU-2127,"Kaur, Anna",anna.kaur@mail.example,02819207166,Bayport,2024-02-02
+CU-2128,"Nasser, Jamal",jamal.nasser@mail.example,+441782111516,Harbor City,06/07/2024
+CU-2129,"Mills, Nate",nate.mills@mail.example,09446468381,Redwood Falls,2026-01-05
+CU-2130,"Okafor, Olga",olga.okafor@mail.example,0607 126 0987,Bayport,2024-01-26
+CU-2131,"Kaur, Carla",N/A,05246385133,Bayport,2025-02-27
+CU-2132,"Hale, Farid",farid.hale@mail.example,08059552733,BAYPORT,22/02/2025
+CU-2133,"Duarte, Nate",nate.duarte@mail.example,05136482053, Bayport,2024-08-16
+CU-2134,"Chen, Kate",kate.chen@mail.example,04504532356,Harbor City,2025-03-27
+CU-2135,"Hale, Irene",irene.hale@mail.example,0935 376 9008,marlow,2026-04-25
+CU-2136,"Mills, Leon",leon.mills@mail.example,+444261100658,Redwood Falls,07/02/2024
+CU-2137,"Stone, Gloria",gloria.stone@mail.example,09221159234,Marlow,2026-02-20
+CU-2137,"Stone, Gloria",gloria.stone@mail.example,09221159234,Marlow,2026-02-20
+CU-2138,"Wright, Gloria",gloria.wright@mail.example,03589444858,MARLOW,2024-11-16
+CU-2139,"Okafor, Ben",ben.okafor@mail.example,03804152452,Marlow,2025-04-18
+CU-2140,"Wright, Nate",nate.wright@mail.example,0150 704 3991, Marlow,01/10/2025
+CU-2141,"Wright, Irene",irene.wright@mail.example,02944485603,Easton,2024-10-09
+CU-2142,"Berg, Irene",irene.berg@mail.example,07555336749,Marlow,2024-02-26
+CU-2143,"Nasser, Irene",irene.nasser@mail.example,08898326531,Easton,2025-06-29
+CU-2144,"Nasser, Rita",rita.nasser@mail.example,+446953100071,EASTON,01/10/2024
+CU-2145,"Rivera, Anna",anna.rivera@mail.example,0376 960 8972,Harbor City,2024-12-02
+CU-2146,"Frost, Hiro",,02842315940,Harbor City,2025-11-29
+CU-2147,"Sato, Mona",mona.sato@mail.example,04231900585, Easton,2025-08-27
+CU-2148,"Nasser, Eva",eva.nasser@mail.example,04761593628,Bayport,09/10/2024
+CU-2149,"Nasser, Leon",leon.nasser@mail.example,03699260469,Marlow,2024-12-25
+CU-2150,"Duarte, Olga",olga.duarte@mail.example,0679 699 9205,BAYPORT,2024-05-05
+CU-2151,"Frost, Kate",kate.frost@mail.example,04948930427,Bayport,2026-04-29
+CU-2152,"Nasser, Paul",,+443873067093,Redwood Falls,08/02/2024
+CU-2153,"Okafor, Leon",leon.okafor@mail.example,08057714263,marlow,2025-03-11
+CU-2154,"Wright, Anna",,02937185969, Easton,2024-04-28
+CU-2155,"Price, Olga",olga.price@mail.example,0599 731 4929,Bayport,2026-06-16
+CU-2156,"Sato, Anna",,06569197199,REDWOOD FALLS,11/07/2024
+CU-2157,"Lam, Jamal",jamal.lam@mail.example,02232659598,Redwood Falls,2025-01-05
+CU-2158,"Wright, Tess",tess.wright@mail.example,02614692117,Redwood Falls,2024-06-12
+CU-2159,"Chen, David",david.chen@mail.example,03279423687,Easton,2024-08-10
+CU-2160,"Kaur, Gloria",gloria.kaur@mail.example,0105 963 6800,Harbor City,23/11/2024
+CU-2161,"Duarte, Kate",N/A,09493488813, Marlow,2026-05-31
+CU-2162,"Lam, Sami",sami.lam@mail.example,05439102401,HARBOR CITY,2025-04-01
+CU-2163,"Frost, Nate",nate.frost@mail.example,09626307702,Marlow,2025-09-20
+CU-2164,"Kaur, Tess",,09781187196,Redwood Falls,02/05/2025
+CU-2165,"Kaur, Mona",mona.kaur@mail.example,0187 730 3832,Bayport,2026-04-15
+CU-2166,"Frost, Eva",eva.frost@mail.example,01212469881,Harbor City,2025-10-31
+CU-2167,"Okafor, Gloria",gloria.okafor@mail.example,08272448035,Easton,2024-12-02
+CU-2168,"Berg, Farid",farid.berg@mail.example,+449979736943,MARLOW,08/08/2024
+CU-2169,"Wright, Ben",ben.wright@mail.example,02681297044,Redwood Falls,2026-04-01
+CU-2170,"Hale, David",,0995 498 2744,Easton,2025-12-04
+CU-2171,"Berg, David",david.berg@mail.example,03721967306,redwood falls,2024-10-18
+CU-2172,"Sato, Rita",rita.sato@mail.example,04097084634,Redwood Falls,22/06/2025
+CU-2173,"Duarte, Hiro",hiro.duarte@mail.example,09104898389,Marlow,2026-03-08
+,,,,,
+CU-2174,"Kaur, Victor",victor.kaur@mail.example,09535328272,EASTON,2026-05-02
+CU-2175,"Kaur, Jamal",N/A,0965 755 2245, Easton,2025-11-05
+CU-2176,"Frost, Rita",rita.frost@mail.example,+447711562299,Easton,11/07/2024
+CU-2177,"Okafor, Kate",kate.okafor@mail.example,02948745018,Marlow,2025-05-23
+CU-2178,"Mills, David",david.mills@mail.example,03387529784,Bayport,2026-05-13
+CU-2179,"Frost, Farid",farid.frost@mail.example,03389985109,Harbor City,2024-12-18
+CU-2180,"Rivera, Eva",eva.rivera@mail.example,0920 960 1519,MARLOW,29/04/2026
+CU-2181,"Kaur, Ben",ben.kaur@mail.example,05115182325,Harbor City,2025-03-08
+CU-2182,"Mills, Carla",carla.mills@mail.example,03633545092, Bayport,2024-11-30
+CU-2183,"Lam, Paul",N/A,03827563217,Bayport,2025-07-14
+CU-2184,"Price, Kate",kate.price@mail.example,+449043933025,Harbor City,22/12/2024
+CU-2185,"Chen, Olga",olga.chen@mail.example,0501 671 7383,Redwood Falls,2024-12-18
+CU-2186,"Wright, Carla",carla.wright@mail.example,08311246848,BAYPORT,2025-06-02
+CU-2187,"Stone, Farid",farid.stone@mail.example,08767855971,Easton,2026-06-06
+CU-2188,"Frost, Sami",sami.frost@mail.example,09741079446,Bayport,06/06/2025
+CU-2189,"Stone, Olga",olga.stone@mail.example,07485481993, Harbor City,2026-04-29
+CU-2190,"Sato, Ben",ben.sato@mail.example,0240 647 7404,Bayport,2025-04-23
+CU-2191,"Price, Rita",rita.price@mail.example,07212400372,Easton,2025-07-28
+CU-2192,"Hale, Anna",anna.hale@mail.example,+445421176237,EASTON,06/05/2026
+CU-2193,"Nasser, Nate",nate.nasser@mail.example,07806467770,Bayport,2025-02-09
+CU-2194,"Lam, Anna",anna.lam@mail.example,08718315738,Bayport,2024-06-15
+CU-2195,"Berg, Ben",ben.berg@mail.example,0100 463 3201,Bayport,2024-04-09
+CU-2195,"Berg, Ben",ben.berg@mail.example,0100 463 3201,Bayport,2024-04-09
+CU-2196,"Sato, Leon",leon.sato@mail.example,04213389510, Easton,19/02/2026
+CU-2197,"Lam, Farid",N/A,07468818203,Harbor City,2024-11-08
+CU-2198,"Rivera, Leon",leon.rivera@mail.example,06422738877,REDWOOD FALLS,2025-02-04
+CU-2199,"Rivera, Kate",kate.rivera@mail.example,02723417386,Easton,2024-01-18
+CU-2200,"Duarte, Ben",ben.duarte@mail.example,0363 934 2660,Easton,21/06/2024
+CU-2201,"Chen, Mona",mona.chen@mail.example,01298525921,Marlow,2024-04-13
+CU-2202,"Stone, Irene",irene.stone@mail.example,09785473364,Harbor City,2024-05-09
+CU-2203,"Price, Eva",eva.price@mail.example,04559646541, Bayport,2025-10-28
+CU-2204,"Hale, Tess",tess.hale@mail.example,03135803807,EASTON,11/06/2024
+CU-2205,"Hale, Sami",sami.hale@mail.example,0393 816 5064,Easton,2024-12-11
+CU-2205,"Hale, Sami",sami.hale@mail.example,0393 816 5064,Easton,2024-12-11
+CU-2206,"Mills, Tess",tess.mills@mail.example,02113705561,Harbor City,2024-01-28
+CU-2207,"Duarte, Carla",carla.duarte@mail.example,07146090333,redwood falls,2025-04-06
+CU-2208,"Kaur, David",david.kaur@mail.example,+447788386515,Redwood Falls,28/05/2025
+CU-2209,"Wright, Hiro",hiro.wright@mail.example,03719432021,Bayport,2026-01-04
+CU-2210,"Nasser, David",david.nasser@mail.example,0604 344 7759,EASTON,2024-04-05
+CU-2211,"Okafor, Tess",N/A,07481012464,Easton,2024-02-02
+CU-2212,"Berg, Jamal",jamal.berg@mail.example,08882969716,Easton,06/01/2024
+CU-2213,"Hale, Ben",ben.hale@mail.example,07982174627,Bayport,2024-11-29
+CU-2214,"Price, Irene",irene.price@mail.example,03285445525,Easton,2026-03-15
+CU-2215,"Nasser, Kate",kate.nasser@mail.example,0497 795 3626,Redwood Falls,2024-01-01
+CU-2216,"Kaur, Paul",paul.kaur@mail.example,+448447990603,MARLOW,11/06/2024
+CU-2217,"Sato, Jamal",jamal.sato@mail.example,09814582035, Redwood Falls,2026-01-27
+CU-2218,"Sato, Hiro",,04657794412,Easton,2024-09-12
+CU-2219,"Frost, Olga",olga.frost@mail.example,05469886839,Bayport,2025-07-16
+CU-2220,"Chen, Leon",leon.chen@mail.example,0855 492 7722,Bayport,08/02/2026
+CU-2221,"Kaur, Olga",olga.kaur@mail.example,08739032946,Marlow,2025-12-16
+CU-2222,"Frost, Tess",tess.frost@mail.example,03352362938,HARBOR CITY,2025-06-01
+CU-2223,"Hale, Kate",kate.hale@mail.example,01886693328,Harbor City,2024-04-29
+CU-2224,"Kaur, Eva",eva.kaur@mail.example,+447404630317, Bayport,26/02/2025
+CU-2225,"Kaur, Hiro",hiro.kaur@mail.example,0948 469 1667,bayport,2025-04-21
+CU-2226,"Price, Victor",victor.price@mail.example,09368101426,Marlow,2026-03-29
+CU-2227,"Rivera, Farid",farid.rivera@mail.example,09632862093,Easton,2024-03-01
+CU-2228,"Price, Carla",,07596712131,REDWOOD FALLS,27/08/2025
+CU-2229,"Price, Hiro",hiro.price@mail.example,09554976707,Redwood Falls,2026-03-18

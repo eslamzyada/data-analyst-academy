@@ -1,0 +1,56 @@
+# ---------------------------------------------------------------------------
+# The learner's progress: private, local only, NEVER committed or pushed.
+# The app keeps it in app/data/academy.db (written via academy.db.tmp).
+# Practice databases (app/data/practice/*.db) ARE application assets and are
+# committed, so .db files are not ignored wholesale.
+# ---------------------------------------------------------------------------
+/app/data/academy.db
+/app/data/academy.db.*
+/app/data/backups/
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Backups live outside the repository (../Data-Analysis-Mastery-backups/).
+/source-backup*/
+*.bak
+
+# The previous Markdown system: a local archive that holds personal progress notes.
+/old-version/
+
+# Reports written for the learner (they describe their progress) and generated
+# coverage output (npm run coverage recreates it).
+/app/reports/
+
+# ---------------------------------------------------------------------------
+# Generated: recreated by npm ci / npm run build / npm run package
+# ---------------------------------------------------------------------------
+node_modules/
+/app/client/dist/
+/release/
+
+# ---------------------------------------------------------------------------
+# Secrets and machine-specific files
+# ---------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+.claude/settings.local.json
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Tool caches, logs, scratch
+graphify-out/
+logs/
+*.log
+npm-debug.log*
+*.tgz
+tmp/
+.tmp/
