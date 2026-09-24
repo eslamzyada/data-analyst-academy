@@ -6,7 +6,9 @@ import initSqlJs from 'sql.js';
 import ExcelJS from 'exceljs';
 
 export const APP = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-export const DATA = path.join(APP, 'data');
+// Where the data build writes. Normally app/data; tools/check-reproducible.js points ACADEMY_BUILD_DATA
+// at a temporary folder so a rebuild can be compared with app/data without touching it.
+export const DATA = process.env.ACADEMY_BUILD_DATA ? path.resolve(process.env.ACADEMY_BUILD_DATA) : path.join(APP, 'data');
 export const FILES = path.join(DATA, 'files');
 export const PRACTICE = path.join(DATA, 'practice');
 

@@ -15,11 +15,14 @@
     "smoke": "node tools/smoke-test.js",
     "test:ui": "node --experimental-websocket tools/test-ui.js",
     "validate:coverage": "node tools/validate-content.js --coverage",
-    "test": "npm run validate && npm run test:grading && npm run test:mastery && npm run smoke && npm run test:ui",
+    "test": "npm run typecheck && npm run validate && npm run test:grading && npm run test:mastery && npm run smoke && npm run check:repro && npm run build && npm run test:ui",
     "coverage": "node tools/coverage-report.js",
     "fixture": "node tools/fixture.js",
     "build:extra": "node tools/build-extra.js",
-    "test:mastery": "node tools/test-mastery.js"
+    "test:mastery": "node tools/test-mastery.js",
+    "typecheck": "tsc --noEmit -p client/tsconfig.json",
+    "check:repro": "node tools/check-reproducible.js",
+    "package": "node tools/package-release.js"
   },
   "dependencies": {
     "exceljs": "^4.4.0",
