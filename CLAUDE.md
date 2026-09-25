@@ -175,3 +175,4 @@ Completion is not mastery. The existing percent (`engine.topicMastery`) still ex
 - A question's options are shown in a fixed order of their own (`displayOrder`), so the stored answer index and the shown one differ. Rewriting an option's **text** is safe; reordering the array changes what every stored attempt meant.
 - Every claim in an explanation should come from the data. Numbers in new content are computed by `build:data` and quoted from `answers.json`, not typed from memory.
 - Before adding a lot of content, check `npm run coverage`: it names every topic below target.
+- Every API error is JSON with a plain message (`wrap` for async handlers, the final `app.use('/api', (err, ...))` for synchronous throws and unreadable request bodies). Never let Express's HTML error page reach the browser: the page would show it as a wall of HTML with a stack trace.
