@@ -54,9 +54,16 @@ export function FormulaGrid({ grid, target, fillTo, cells, spill, correct }: { g
 // ------------------------------------------------------------------ SQL editor (CodeMirror)
 let dbCache: any[] | null = null;
 export async function loadDbs() {
-  if (!dbCache) dbCache = await api('/api/sql/dbs');
+  if (!dbCache) {
+    const list = await api('/api/sql/dbs');
+    if (!Array.isArray(list) || !list.length) throw new Error('No practice databases came back');
+    dbCache = list;
+  }
   return dbCache;
 }
+
+/** Question titles are written in Markdown (**bold**, `code`); lists show them as plain text. */
+export const plainTitle = (t: string) => String(t || '').replace(/\*\*|__|`/g, '');
 
 export function SqlEditor({ value, onChange, onRun, db, height = '180px' }: { value: string; onChange: (v: string) => void; onRun?: () => void; db?: string; height?: string }) {
   const [schema, setSchema] = useState<any>(undefined);
@@ -78,13 +85,28 @@ export function SqlEditor({ value, onChange, onRun, db, height = '180px' }: { va
   );
 }
 
-/** Query results show numbers as they are: no thousands separators on IDs or years. */
-const raw = (v: any) => (typeof v === 'number' ? (Number.isInteger(v) ? String(v) : String(Math.round(v * 1e6) / 1e6)) : v);
+/** Query results show numbers as they are: no thousands separators on IDs or years. Anything that is
+ *  not text or a number (a binary value, for example) is shown as a label: React cannot render an
+ *  object, and one such value used to blank the whole app. */
+export const raw = (v: any) => {
+  if (typeof v === 'number') return Number.isInteger(v) ? String(v) : String(Math.round(v * 1e6) / 1e6);
+  if (typeof v === 'boolean') return v ? 'TRUE' : 'FALSE';
+  if (v !== null && typeof v === 'object') return v.binary ? `(binary data, ${v.bytes} bytes)` : '(binary data)';
+  return v;
+};
 
 export function ResultTable({ res }: { res: any }) {
   if (!res) return null;
   if (!res.columns || !res.columns.length) {
     return <div className="muted small">The statement ran{res.changed ? ` and would change ${res.changed} row(s)` : ''}. Practice databases are read-only, so nothing was saved.</div>;
+  }
+  if (!res.rows || !res.rows.length) {
+    return (
+      <div className="small" data-empty-result>
+        <b>No rows matched.</b> Your query ran without errors; nothing met its conditions. Loosen a WHERE condition to see rows.
+        <div className="tiny muted" style={{ marginTop: 4 }}>Columns it would show: {res.columns.join(', ')}</div>
+      </div>
+    );
   }
   return (
     <div>
@@ -110,13 +132,19 @@ export function ResultTable({ res }: { res: any }) {
 export function SchemaDrawer({ db, onClose, onInsert }: { db: string; onClose: () => void; onInsert?: (text: string) => void }) {
   const [info, setInfo] = useState<any>(null);
   const [open, setOpen] = useState<string | null>(null);
-  useEffect(() => { loadDbs().then((d) => setInfo(d.find((x) => x.id === db))); }, [db]);
+  const [missing, setMissing] = useState<string | null>(null);
+  useEffect(() => {
+    loadDbs().then((d) => { const found = d.find((x) => x.id === db); setInfo(found || null); if (!found) setMissing(`There is no practice database called "${db}".`); })
+      .catch((e) => setMissing(`The tables could not be loaded (${e.message}).`));
+  }, [db]);
   return (
     <>
       <div className="drawer-bg" onClick={onClose} />
-      <div className="drawer">
-        <div className="row between"><h3 style={{ margin: 0 }}>{info?.title || 'Tables'}</h3><button className="btn ghost sm" onClick={onClose}><Icon name="x" /></button></div>
+      <div className="drawer" role="dialog" aria-label="Database schema">
+        <div className="row between"><h3 style={{ margin: 0 }}>{info?.title || 'Tables'}</h3><button className="btn ghost sm" onClick={onClose} aria-label="Close"><Icon name="x" /></button></div>
+        {missing && <div className="sql-error" style={{ marginTop: 8 }}>{missing}</div>}
         {info && <p className="muted small" style={{ marginTop: 8 }}>{info.description}</p>}
+        {info && <p className="small" style={{ margin: '4px 0 8px' }}>SQL dialect: <b>{info.dialect || 'SQLite'}</b>. Write table names directly (<code>FROM {info.tables[0]?.name}</code>), with no database name.</p>}
         {info?.notes?.length > 0 && <ul className="small" style={{ paddingLeft: 18 }}>{info.notes.map((n: string, i: number) => <li key={i}>{n}</li>)}</ul>}
         {info?.tables.map((t: any) => (
           <div key={t.name} style={{ borderTop: '1px solid var(--line)', padding: '8px 0' }}>
@@ -129,9 +157,15 @@ export function SchemaDrawer({ db, onClose, onInsert }: { db: string; onClose: (
                 {t.columns.map((c: any) => (
                   <div key={c.name} className="small" style={{ padding: '2px 0' }}>
                     <span className="mono" style={{ cursor: onInsert ? 'pointer' : 'default', color: 'var(--primary-ink)' }} onClick={() => onInsert && onInsert(c.name)}>{c.name}</span>
-                    <span className="muted tiny"> {c.type.toLowerCase()}</span>{c.description && <span className="muted tiny"> · {c.description}</span>}
+                    <span className="muted tiny"> {String(c.type || '').toLowerCase()}</span>{c.description && <span className="muted tiny"> · {c.description}</span>}
                   </div>
                 ))}
+                {t.links?.length > 0 && (
+                  <div className="tiny" style={{ marginTop: 6 }}>
+                    <span className="muted">Connects to: </span>
+                    {t.links.map((l: any, i: number) => <span key={i} className="mono">{i ? ', ' : ''}{l.table} (on {l.column})</span>)}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -180,6 +214,58 @@ export function DataTable({ datasetId, part }: { datasetId: string; part?: strin
         <span className="muted small">rows {data.total ? state.offset + 1 : 0}–{Math.min(state.offset + limit, data.total)}</span>
         <button className="btn sm" disabled={state.offset + limit >= data.total} onClick={() => setState({ ...state, offset: state.offset + limit })}>Next</button>
       </div>
+    </div>
+  );
+}
+
+/**
+ * A query that did not run, explained: what went wrong in plain words, the tables or columns that
+ * do exist (click to add), the closest name, an example in this app's dialect, and a way back to
+ * the editor. The SQL engine's own message is kept under "Technical details".
+ */
+export function SqlError({ res, dbTitle, onInsert, onBack }: { res: any; dbTitle?: string; onInsert?: (text: string) => void; onBack?: () => void }) {
+  const h = res?.help || null;
+  if (!h) return <div className="sql-error" role="alert">{res?.error || 'The query could not run.'}</div>;
+  const chip = (text: string) => (onInsert
+    ? <button key={text} className="chip mono" onClick={() => onInsert(text)}>{text}</button>
+    : <span key={text} className="chip mono">{text}</span>);
+  return (
+    <div className="sql-error-card" role="alert" data-kind={h.kind}>
+      <b>{h.title}</b>
+      <p className="small" style={{ margin: '6px 0 8px' }}>{h.message}</p>
+      {h.suggestion && <p className="small" style={{ margin: '0 0 8px' }}>Did you mean {chip(h.suggestion)}?</p>}
+      {h.columns?.length > 0 && <div className="row" style={{ flexWrap: 'wrap', gap: 6, marginBottom: 8 }}><span className="tiny muted">Columns:</span>{h.columns.map(chip)}</div>}
+      {h.tables?.length > 0 && h.kind !== 'unknown-column' && <div className="row" style={{ flexWrap: 'wrap', gap: 6, marginBottom: 8 }}><span className="tiny muted">Tables{dbTitle ? ` in ${dbTitle}` : ''}:</span>{h.tables.map(chip)}</div>}
+      {h.databases?.length > 0 && <div className="tiny" style={{ marginBottom: 8 }}>Databases: {h.databases.map((d: any) => d.title).join(', ')}</div>}
+      {h.example && <><div className="tiny muted">Example ({h.dialect || 'SQLite'}):</div><pre className="mono small" style={{ margin: '4px 0 8px' }}>{h.example}</pre></>}
+      <div className="row">
+        {onBack && <button className="btn sm" onClick={onBack}><Icon name="sql" size={14} />Back to the editor</button>}
+        {res.error && res.error !== h.message && <details className="tech-details"><summary className="mini muted">Technical details</summary><pre className="mono mini" style={{ whiteSpace: 'pre-wrap', margin: '6px 0 0' }}>{res.error}</pre></details>}
+      </div>
+    </div>
+  );
+}
+
+/** Above an SQL task: the database it uses, the dialect, and its tables (click to add one). */
+export function SqlTaskContext({ db, onSchema, onInsert }: { db: string; onSchema: () => void; onInsert: (text: string) => void }) {
+  const [info, setInfo] = useState<any>(undefined);
+  useEffect(() => { loadDbs().then((d) => setInfo(d.find((x) => x.id === db) || null)).catch(() => setInfo(null)); }, [db]);
+  return (
+    <div className="sql-task-context">
+      <div className="row between" style={{ alignItems: 'flex-start' }}>
+        <div className="small">
+          <span className="label">Database</span> <b>{info?.title || db}</b>
+          {info && <span className="muted"> · {info.dialect || 'SQLite'} · write table names directly · Ctrl+Enter runs the query</span>}
+        </div>
+        <button className="btn ghost sm" onClick={onSchema}><Icon name="table" size={15} />Tables &amp; columns</button>
+      </div>
+      {info && (
+        <div className="row" style={{ flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
+          <span className="tiny muted">Tables:</span>
+          {info.tables.map((t: any) => <button key={t.name} className="chip mono" title={t.description} onClick={() => onInsert(t.name)}>{t.name}</button>)}
+        </div>
+      )}
+      {info === null && <div className="tiny muted" style={{ marginTop: 6 }}>The table list could not be loaded; the task still works.</div>}
     </div>
   );
 }

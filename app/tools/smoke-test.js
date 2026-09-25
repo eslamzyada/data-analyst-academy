@@ -137,6 +137,48 @@ try {
   const slow = (await api('POST', '/api/sql/run', { db: 'restaurant', sql: 'SELECT COUNT(*) FROM daily_sales a, daily_sales b, daily_sales c' })).json;
   check('runaway query is stopped', slow.ok === false && /8 seconds/.test(slow.error), JSON.stringify(slow));
   const ok2 = (await api('POST', '/api/sql/run', { db: 'hr', sql: 'SELECT COUNT(*) FROM employees' })).json;
+  check('SQL: a stopped query is explained (too long, a JOIN without ON)', slow.help && slow.help.kind === 'timeout' && /ON condition/.test(slow.help.message), JSON.stringify(slow.help));
+  {
+    const sq = async (db, sql) => (await api('POST', '/api/sql/run', { db, sql }));
+    const help = async (db, sql) => { const r = await sq(db, sql); return { status: r.status, ok: r.json.ok, ...(r.json.help || {}), raw: r.json }; };
+    const dbs = (await api('GET', '/api/sql/dbs')).json;
+    const ced = dbs.find((d) => d.id === 'cedarline');
+    check('SQL: every database says whether it can be opened, its dialect and a first query', dbs.length === 3 && dbs.every((d) => d.status === 'ready' && /^SQLite 3\.\d+/.test(d.dialect) && d.starter && /LIMIT 10/.test(d.starter.sql)), JSON.stringify(dbs.map((d) => [d.id, d.status, d.dialect, d.starter])));
+    check('SQL: tables show their connections (declared, or shared id columns)', dbs.every((d) => d.tables.some((t) => t.links.length)) && ced.tables.find((t) => t.name === 'orders').links.some((l) => l.table === 'customers'), JSON.stringify(ced.tables.find((t) => t.name === 'orders').links));
+    const cases = [
+      ['wrong database', 'Cedarline Outdoor Supply', 'SELECT 1', 'unknown-database', (h) => h.databases && h.databases.length === 3],
+      ['the database name in front of the table', 'cedarline', 'SELECT * FROM cedarline.orders LIMIT 5', 'db-prefix', (h) => h.suggestion === 'orders' && /FROM orders/.test(h.message)],
+      ['a wrong table', 'cedarline', 'SELECT * FROM Orders2', 'unknown-table', (h) => h.suggestion === 'orders' && h.tables.includes('customers') && /Orders2/.test(h.title)],
+      ['a table name without its plural', 'cedarline', 'SELECT * FROM customer', 'unknown-table', (h) => h.suggestion === 'customers'],
+      ['a wrong column', 'cedarline', 'SELECT nme FROM customers', 'unknown-column', (h) => h.columns.includes('full_name') && !h.columns.includes('order_id')],
+      ['invalid syntax', 'cedarline', 'SELEC * FROM orders', 'syntax', (h) => /SELEC/.test(h.message)],
+      ['an empty query', 'cedarline', '   ', 'empty', (h) => /LIMIT 10/.test(h.example)],
+      ['a query that stops too early', 'cedarline', 'SELECT * FROM', 'incomplete', (h) => !!h.example],
+      ['USE, from another database system', 'cedarline', 'USE cedarline', 'other-dialect', (h) => /already connected/.test(h.message)],
+      ['SHOW TABLES', 'restaurant', 'SHOW TABLES', 'other-dialect', (h) => h.tables.length > 5 && /sqlite_master/.test(h.example)],
+      ['SELECT TOP (SQL Server)', 'hr', 'SELECT TOP 5 * FROM employees', 'other-dialect', (h) => /LIMIT/.test(h.title)],
+      ['two queries at once', 'cedarline', 'SELECT 1; SELECT 2;', 'several', () => true],
+    ];
+    for (const [label, db, sql, kind, extra] of cases) {
+      const h = await help(db, sql);
+      check(`SQL: ${label} -> "${kind}" help, status 200, no crash`, h.status === 200 && h.ok === false && h.kind === kind && !!h.title && extra(h), JSON.stringify(h).slice(0, 300));
+    }
+    const none = (await sq('cedarline', 'SELECT * FROM orders WHERE 1 = 0')).json;
+    check('SQL: a valid query with no rows is a normal result (columns, no rows)', none.ok && none.rows.length === 0 && none.columns.length > 3, JSON.stringify(none).slice(0, 160));
+    const many = (await sq('cedarline', 'SELECT * FROM order_items')).json;
+    check('SQL: a valid query with many rows returns the first 1,000 and says how many there are', many.ok && many.rows.length === 1000 && many.total > 10000 && many.truncated, JSON.stringify({ n: many.rows?.length, total: many.total }));
+    const blob = (await sq('cedarline', 'SELECT randomblob(4) AS b')).json;
+    check('SQL: a binary value comes back as a label the page can show, not raw bytes', blob.ok && blob.rows[0][0] && blob.rows[0][0].binary === true && blob.rows[0][0].bytes === 4, JSON.stringify(blob.rows));
+    await api('POST', '/api/test/sql-faults', { sql: 'missing' });
+    const down = await help('cedarline', 'SELECT * FROM customers LIMIT 3');
+    const dbsDown = (await api('GET', '/api/sql/dbs')).json;
+    await api('POST', '/api/test/sql-faults', { sql: 'ok' });
+    check('SQL: a missing practice database -> "unavailable", told as the app\'s problem, not the learner\'s', down.kind === 'unavailable' && /not with your query/.test(down.message), JSON.stringify(down).slice(0, 200));
+    check('SQL: ...and the database list shows it as unavailable', dbsDown.every((d) => d.status === 'unavailable'), JSON.stringify(dbsDown.map((d) => d.status)));
+    const back = (await sq('cedarline', 'SELECT COUNT(*) FROM customers')).json;
+    check('SQL: after it comes back, queries run normally', back.ok && back.rows[0][0] > 1000, JSON.stringify(back).slice(0, 120));
+    check('SQL: the Academy stayed up through every bad query', (await api('GET', '/api/health')).status === 200);
+  }
   check('SQL runner recovers after a stopped query', ok2.ok && ok2.rows[0][0] > 1000, JSON.stringify(ok2));
   const dbs = (await api('GET', '/api/sql/dbs')).json;
   check('SQL Lab lists 3 databases with tables and columns', dbs.length === 3 && dbs.every((d) => d.tables.length && d.tables[0].columns.length));

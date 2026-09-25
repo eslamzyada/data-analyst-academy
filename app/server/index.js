@@ -12,7 +12,7 @@ import * as quizsessions from './quizsessions.js';
 import { OUTCOME, isRecordable, outcomeOf } from '../shared/lifecycle.js';
 import { loadContent, content, clientItem, getItem, toStoredAnswer, toShownAnswer, shownExplain } from './content/index.js';
 import * as engine from './engine.js';
-import { initSqlRunner, runSql } from './sqlrunner.js';
+import { initSqlRunner, runSql, setSqlFaultForTests } from './sqlrunner.js';
 import { gradeSql, expectedResult } from './grading/sql.js';
 import { gradeFormula, evaluate, setEvaluatorForTests, clearFormulaCache, parseAddr, idxToCol } from './grading/formula.js';
 import { readAnswerCells, gradeParts } from './grading/excel.js';
@@ -27,6 +27,7 @@ import * as analyst from './analyst.js';
 import { adaptFor, guidanceNote } from './adaptive.js';
 import { milestones } from './milestones.js';
 import { guardServerDataDir } from './safety.js';
+import { sqlHelp } from './sqlhelp.js';
 
 const APP = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DATA = process.env.ACADEMY_DATA ? path.resolve(process.env.ACADEMY_DATA) : path.join(APP, 'data');
@@ -78,6 +79,19 @@ initSqlRunner(path.join(ASSETS, 'practice'));
 
 const app = express();
 app.use(express.json({ limit: '2mb' }));
+// Tests only: make one GET API path answer with a body that makes no sense to the page, to prove a
+// page that receives nonsense shows a friendly message instead of blanking the whole Academy.
+if (process.env.ACADEMY_TEST_FAULTS === '1') {
+  const broken = new Set();
+  app.post('/api/test/break-api', (req, res) => {
+    const p = String(req.body.path || '');
+    if (req.body.on === false) broken.delete(p); else broken.add(p);
+    res.json({ broken: [...broken] });
+  });
+  app.use((req, res, next) => (req.method === 'GET' && broken.has(req.path) ? res.json({ profile: { name: 'Test', onboarded: true }, broken: true }) : next()));
+  // every practice database unavailable, as if its file were gone ('missing'), or back to normal
+  app.post('/api/test/sql-faults', (req, res) => { setSqlFaultForTests(req.body.sql === 'missing' ? 'missing' : null); res.json({ sql: req.body.sql === 'missing' ? 'missing' : 'ok' }); });
+}
 // Every change is on disk before the app answers. What the learner sees as done (a checked answer,
 // a finished quiz, a completed lesson) then survives even the app being killed a moment later.
 app.use((req, res, next) => {
@@ -890,28 +904,78 @@ app.get('/api/datasets/:id/preview', wrap(async (req, res) => {
 app.use('/files', express.static(path.join(ASSETS, 'files'), { fallthrough: false, setHeaders: (res) => res.setHeader('Content-Disposition', 'attachment') }));
 
 // ------------------------------------------------------------------ SQL lab
+// ------------------------------------------------------------------ SQL Lab: what each database holds
+// Every practice database with its tables, columns (and types), row counts, how the tables connect,
+// whether it can be opened right now, the SQL dialect, and a first query to start from.
+let sqlDialect = null;
+async function dialectName() {
+  if (!sqlDialect) { const v = await runSql(content.databases[0].id, 'SELECT sqlite_version()', 1); if (v.ok) sqlDialect = `SQLite ${v.rows[0][0]}`; }
+  return sqlDialect || 'SQLite';
+}
+async function describeDatabase(d) {
+  const tables = [];
+  let reachable = true;
+  for (const [name, info] of Object.entries(d.tables)) {
+    const cols = await runSql(d.id, `SELECT name, type FROM pragma_table_info('${name}')`, 200);
+    const cnt = await runSql(d.id, `SELECT COUNT(*) FROM ${name}`, 1);
+    const fks = await runSql(d.id, `SELECT "table", "from", "to" FROM pragma_foreign_key_list('${name}')`, 50);
+    if (!cols.ok || cols.fault || !cols.rows.length) reachable = false;
+    tables.push({ name, description: info.description, rows: cnt.ok ? cnt.rows[0][0] : null,
+      columns: cols.ok ? cols.rows.map(([c, t]) => ({ name: c, type: t || '', description: info.columns?.[c] || '' })) : [],
+      links: fks.ok ? fks.rows.map(([table, from, to]) => ({ table, column: from === to ? from : `${from} = ${table}.${to}` })) : [] });
+  }
+  // no declared relationships: tables that share an id column can be joined on it
+  if (!tables.some((t) => t.links.length)) {
+    for (const t of tables) {
+      for (const c of t.columns.filter((x) => /_id$/.test(x.name))) {
+        for (const o of tables) if (o !== t && o.columns.some((x) => x.name === c.name) && !t.links.some((l) => l.table === o.name)) t.links.push({ table: o.name, column: c.name });
+      }
+    }
+  }
+  const first = tables.find((t) => /customer/.test(t.name)) || tables.find((t) => t.rows) || tables[0];
+  return { id: d.id, title: d.title, business: d.business, description: d.description, notes: d.notes || [], tables,
+    status: reachable ? 'ready' : 'unavailable', dialect: await dialectName(),
+    starter: first ? { table: first.name, sql: `SELECT *\nFROM ${first.name}\nLIMIT 10;`, explain: `This shows the first 10 rows of ${first.name}. Press Run query to see them, then change the query or write your own.` } : null };
+}
 app.get('/api/sql/dbs', wrap(async (req, res) => {
   const out = [];
-  for (const d of content.databases) {
-    const tables = [];
-    for (const [name, info] of Object.entries(d.tables)) {
-      const cols = await runSql(d.id, `SELECT name, type FROM pragma_table_info('${name}')`, 200);
-      const cnt = await runSql(d.id, `SELECT COUNT(*) FROM ${name}`, 1);
-      tables.push({ name, description: info.description, rows: cnt.ok ? cnt.rows[0][0] : null,
-        columns: cols.ok ? cols.rows.map(([c, t]) => ({ name: c, type: t || '', description: info.columns?.[c] || '' })) : [] });
-    }
-    out.push({ id: d.id, title: d.title, business: d.business, description: d.description, notes: d.notes || [], tables });
-  }
+  for (const d of content.databases) out.push(await describeDatabase(d));
   res.json(out);
 }));
 
+// table and column names per database, for explaining a query that did not run (built once)
+const schemaCache = new Map();
+async function schemaOf(id) {
+  if (!schemaCache.has(id)) {
+    const d = content.databaseMap[id];
+    const tables = [];
+    for (const name of Object.keys(d.tables)) {
+      const cols = await runSql(id, `SELECT name FROM pragma_table_info('${name}')`, 200);
+      tables.push({ name, columns: cols.ok ? cols.rows.map((r) => r[0]) : [] });
+    }
+    const schema = { id, title: d.title, tables };
+    if (tables.every((t) => t.columns.length)) schemaCache.set(id, schema);
+    return schema;
+  }
+  return schemaCache.get(id);
+}
+
+// A query that did not run always comes back as { ok: false, error, help } with status 200: the
+// problem belongs in the result area of the page, never in a crash. help explains it for a beginner.
 app.post('/api/sql/run', wrap(async (req, res) => {
   const db = String(req.body.db || '');
-  if (!content.databaseMap[db]) return res.status(400).json({ ok: false, error: 'Pick a database first.' });
-  const r = await runSql(db, String(req.body.sql || ''), 1000);
+  const sql = String(req.body.sql || '');
+  const dialect = await dialectName();
+  if (!content.databaseMap[db]) {
+    const databases = content.databases.map((d) => ({ id: d.id, title: d.title }));
+    return res.json({ ok: false, error: 'That database could not be found.', help: sqlHelp(null, sql, null, { kind: 'unknown-database', asked: db, databases, dialect }) });
+  }
+  const r = await runSql(db, sql, 1000);
   if (!r.ok) {
     const { explainSqlError } = await import('./grading/sql.js');
-    return res.json({ ...r, error: explainSqlError(r.error) });
+    const kind = r.timeout ? 'timeout' : r.fault ? 'unavailable' : r.empty ? 'empty' : r.several ? 'several' : null;
+    const schema = kind === 'unavailable' ? { id: db, title: content.databaseMap[db].title, tables: [] } : await schemaOf(db);
+    return res.json({ ...r, error: explainSqlError(r.error), help: sqlHelp(r.error, sql, schema, { kind, dialect }) });
   }
   res.json(r);
 }));

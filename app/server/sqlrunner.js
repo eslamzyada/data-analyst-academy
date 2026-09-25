@@ -87,10 +87,15 @@ export function splitStatements(sql) {
 }
 const stripComments = (s) => s.replace(/--[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
 
+// Test hook (tests only): 'missing' makes every practice database unavailable, as if its file were gone.
+let testFault = null;
+export function setSqlFaultForTests(mode) { testFault = mode || null; }
+
 export function runSql(db, sql, maxRows = 1000) {
   const statements = splitStatements(sql || '');
-  if (statements.length === 0) return Promise.resolve({ ok: false, error: 'Write a query first.' });
-  if (statements.length > 1) return Promise.resolve({ ok: false, error: 'Please run one query at a time (remove the extra statements after the first semicolon).' });
+  if (statements.length === 0) return Promise.resolve({ ok: false, empty: true, error: 'Write a query first.' });
+  if (statements.length > 1) return Promise.resolve({ ok: false, several: true, error: 'Please run one query at a time (remove the extra statements after the first semicolon).' });
+  if (testFault === 'missing') return Promise.resolve({ ok: false, fault: true, error: `Practice database "${db}" is missing (a fault injected by the tests)` });
   return new Promise((resolve) => {
     queue.push({ id: ++seq, db, sql: statements[0], maxRows, resolve });
     pump();
