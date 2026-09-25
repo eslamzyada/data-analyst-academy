@@ -280,7 +280,7 @@ export default function ItemRunner({
           <FormulaGrid grid={item.grid} target={item.target} fillTo={item.fillTo} cells={result?.cells} spill={result?.spill} correct={result && outcome !== OUTCOME.EVALUATION_ERROR ? !!result.correct : null} />
           <div className="formula-bar">
             <span className="cell">{item.target}</span><span className="fx">fx</span>
-            <input type="text" value={answer ?? ''} disabled={locked} placeholder="=" onChange={(e) => update(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && canSubmit && !exam) submit(); }} />
+            <input type="text" value={answer ?? ''} disabled={locked} placeholder="Type a formula, starting with =" aria-label={`Formula for ${item.target}`} onChange={(e) => update(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && canSubmit && !exam) submit(); }} />
           </div>
           {item.fillTo && <div className="muted small">Your formula is written in {item.target} and then copied down to {item.fillTo}, just like dragging the fill handle in Excel.</div>}
         </div>
@@ -339,7 +339,7 @@ export default function ItemRunner({
             {busy ? <span className="spinner" /> : <Icon name="refresh" size={15} />}{unchecked ? 'Try checking again' : 'Check again'}
           </button>
           {unchecked
-            ? <span className="muted small">Your answer is saved. Nothing has been marked wrong.</span>
+            ? <span className="muted small">You can check again at any time.</span>
             : <span className="muted small">Change your answer, then check again. Hints below if you're stuck.</span>}
         </div>
       )}
@@ -439,12 +439,13 @@ function Feedback({ item, result, onSelfMark }: { item: any; result: any; onSelf
   // The app could not reach a verdict. This is not a wrong answer, and must not look like one.
   if (outcome === OUTCOME.EVALUATION_ERROR || (outcome === OUTCOME.NOT_EVALUABLE && !result.selfCheck)) {
     const appFault = outcome === OUTCOME.EVALUATION_ERROR;
+    const empty = result.reason === 'empty';
     return (
-      <div className="feedback warn" data-outcome={outcome}>
-        <h4><Icon name="bulb" size={19} />{appFault ? 'Not checked: the app had a problem' : 'This answer can\'t be checked automatically here'}</h4>
+      <div className="feedback warn" data-outcome={outcome} data-reason={result.reason || ''}>
+        <h4><Icon name="bulb" size={19} />{empty ? 'Nothing to check yet' : appFault ? 'We couldn\'t check this right now' : `We couldn't check this ${item.type === 'formula' ? 'formula' : 'answer'} automatically`}</h4>
         {result.feedback && <p style={{ margin: '0 0 8px' }}>{result.feedback}</p>}
         {(result.explain || result.solution) && <details style={{ marginBottom: 8 }}><summary className="small">Show the explanation and model answer</summary>{result.explain && <Markdown text={result.explain} />}{result.solution && <Markdown text={result.solution} />}</details>}
-        {onSelfMark && (
+        {onSelfMark && !empty && (
           <>
             <p className="small muted" style={{ margin: '8px 0 6px' }}>If you have compared your answer with the model solution, you can record it yourself. Honest marking keeps your progress meaningful.</p>
             <div className="row">
@@ -453,15 +454,16 @@ function Feedback({ item, result, onSelfMark }: { item: any; result: any; onSelf
             </div>
           </>
         )}
-        {result.engineError && <p className="mini muted" style={{ marginTop: 8 }}>Technical detail: {result.engineError}</p>}
+        <TechnicalDetails result={result} />
       </div>
     );
   }
 
   return (
     <div className={`feedback ${ok ? 'ok' : 'no'}`} data-outcome={outcome}>
-      <h4 style={{ color: ok ? 'var(--good)' : 'var(--bad)' }}><Icon name={ok ? 'check' : 'x'} size={19} />{ok ? 'Correct' : result.score > 0 && result.score < 1 && result.parts ? `${Math.round(result.score * 100)}% right` : 'Not quite'}</h4>
+      <h4 style={{ color: ok ? 'var(--good)' : 'var(--bad)' }}><Icon name={ok ? 'check' : 'x'} size={19} />{ok ? 'Correct' : result.score > 0 && result.score < 1 && result.parts ? `${Math.round(result.score * 100)}% right` : INCORRECT_HEADING[result.reason] || 'Not quite'}</h4>
       {result.feedback && <p style={{ margin: '0 0 8px' }}>{result.feedback}</p>}
+      {result.notice && <p className="small muted" style={{ margin: '0 0 8px' }}><Icon name="bulb" size={13} /> {result.notice}</p>}
       {result.error && <div className="sql-error" style={{ marginBottom: 8 }}>{result.error}</div>}
       {result.parts && <PartsBreakdown parts={result.parts} score={result.score} />}
       {result.formulasUsed !== undefined && result.formulasUsed !== null && <p className="small muted">Formulas found in your workbook: {result.formulasUsed}.</p>}
@@ -476,7 +478,27 @@ function Feedback({ item, result, onSelfMark }: { item: any; result: any; onSelf
       {rec && rec.masteryBefore !== null && rec.masteryAfter !== null && rec.masteryBefore !== rec.masteryAfter && (
         <div className="mastery-note">Topic progress: {rec.masteryBefore}% → <b>{rec.masteryAfter}%</b></div>
       )}
+      <TechnicalDetails result={result} />
     </div>
+  );
+}
+
+// A wrong answer the learner made that Excel would also refuse, named for what it is.
+const INCORRECT_HEADING: Record<string, string> = {
+  syntax: 'Excel can\'t read this formula',
+  'unknown-function': 'Excel doesn\'t know that function',
+  'not-excel': 'That function isn\'t in Excel',
+};
+
+/** The engine's own words, only for someone who asks. The normal view stays in plain language. */
+function TechnicalDetails({ result }: { result: any }) {
+  const text = result.technical || result.engineError || null;
+  if (!text) return null;
+  return (
+    <details className="tech-details" style={{ marginTop: 8 }}>
+      <summary className="mini muted">Technical details</summary>
+      <pre className="mono mini" style={{ whiteSpace: 'pre-wrap', margin: '6px 0 0' }}>{text}</pre>
+    </details>
   );
 }
 
@@ -532,7 +554,7 @@ export function initialAnswer(item: any, exam?: any) {
     case 'mc': case 'tf': return null;
     // the server sends a scrambled starting order that is never already the answer
     case 'order': return Array.isArray(item.start) ? [...item.start] : item.options.map((_: any, i: number) => i).reverse();
-    case 'formula': return '=';
+    case 'formula': return '';
     case 'sql': return item.starter || '';
     case 'numbers': case 'file': return item.questions.map(() => '');
     default: return '';
@@ -542,7 +564,7 @@ export function hasAnswer(item: any, a: any) {
   if (a === null || a === undefined) return false;
   if (item.type === 'mc' || item.type === 'tf') return true;
   if (item.type === 'numbers' || item.type === 'file') return Array.isArray(a) && a.some((x: string) => String(x || '').trim());
-  if (item.type === 'formula') return String(a || '').replace('=', '').trim().length > 0;
+  if (item.type === 'formula') return String(a || '').trim().replace(/^=+/, '').trim().length > 0;
   if (item.type === 'order') return true;
   if (item.type === 'sql') return String(a || '').trim().length > 0 && String(a || '').trim() !== String(item.starter || '').trim();
   return String(a || '').trim().length > 0;

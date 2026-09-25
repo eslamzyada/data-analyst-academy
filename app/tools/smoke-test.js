@@ -432,7 +432,7 @@ try {
   const broken = (await api('POST', '/api/items/xl-basics-p2/submit', { answer: '=B2*1.0001', source: 'practice', ctx: 'task' })).json;
   check('GRADING: calculator broken ("no AST with such key") -> EVALUATION_ERROR, not marked wrong', broken.outcome === 'EVALUATION_ERROR' && broken.correct === false && broken.recorded === null, JSON.stringify(broken).slice(0, 300));
   check('GRADING: the task is "submitted", not "try again"', broken.state === 'submitted', broken.state);
-  check('GRADING: the learner is told plainly and still gets a way forward', /could not check/i.test(broken.feedback) && !!(broken.next && broken.next.to), JSON.stringify(broken).slice(0, 300));
+  check('GRADING: the learner is told plainly and still gets a way forward', /could(n't| not) check/i.test(broken.feedback) && !!(broken.next && broken.next.to), JSON.stringify(broken).slice(0, 300));
   // a quiz attempt that contains a formula question (drawn at random, so draw until one does)
   let sq = null;
   let fq = null;
@@ -457,6 +457,41 @@ try {
   }
   const good = (await api('POST', '/api/items/xl-basics-p2/submit', { answer: p2Model, source: 'practice' })).json;
   check('GRADING: once the calculator works again the same task is checked normally', good.outcome === 'CORRECT' && good.method === 'engine', JSON.stringify(good).slice(0, 200));
+
+  // ================================================================ FORMULA: learner mistakes vs app problems, through the API
+  {
+    const count = async () => (await api('GET', '/api/progress')).json.stats.answered;
+    const submit = async (answer) => (await api('POST', '/api/items/xl-basics-p2/submit', { answer, source: 'practice', ctx: 'task' })).json;
+    const c0 = await count();
+    const dbl = await submit('=' + p2Model);
+    check('FORMULA: a doubled "=" (==...) is read as one: CORRECT, recorded as a right answer, with a small tip', dbl.outcome === 'CORRECT' && dbl.recorded && /single "="/.test(dbl.notice || ''), JSON.stringify(dbl).slice(0, 240));
+    const saved = (await api('GET', '/api/state/item:xl-basics-p2')).json.state;
+    check('FORMULA: the result kept for a refresh remembers why (reason) and the tip', saved && saved.result && saved.result.reason === 'correct' && /single "="/.test(saved.result.notice || ''), JSON.stringify(saved && saved.result).slice(0, 200));
+    const syn = await submit('=B2/($B$7');
+    const syn2 = await submit('=B2*/C2');
+    check('FORMULA: a mistake Excel would reject -> INCORRECT (reason syntax), recorded, explained without parser jargon', syn2.outcome === 'INCORRECT' && syn2.reason === 'syntax' && syn2.recorded && !/Parsing|Token/.test(syn2.feedback), JSON.stringify(syn2).slice(0, 240));
+    check('FORMULA: a missing closing bracket at the very end is accepted, as Excel closes it itself', syn.outcome === 'CORRECT', JSON.stringify(syn).slice(0, 160));
+    const c1 = await count();
+    const uns = await submit('=NUMBERVALUE(B2)*C2');
+    check('FORMULA: a real Excel function the calculator lacks -> NOT_EVALUABLE, nothing recorded', uns.outcome === 'NOT_EVALUABLE' && uns.reason === 'unsupported-function' && uns.recorded === null, JSON.stringify(uns).slice(0, 200));
+    await api('POST', '/api/test/faults', { formula: 'parse' });
+    const parsed = await submit(p2Model);
+    check('FORMULA: the parser fails on a valid formula -> NOT_EVALUABLE, nothing recorded, engine text only in technical details',
+      parsed.outcome === 'NOT_EVALUABLE' && parsed.reason === 'parser' && parsed.recorded === null && !/Parsing/.test(parsed.feedback) && /Parsing/.test(parsed.technical || ''), JSON.stringify(parsed).slice(0, 260));
+    await api('POST', '/api/test/faults', { formula: 'throw' });
+    const crashed = await submit(p2Model);
+    check('FORMULA: the grader itself crashes -> EVALUATION_ERROR, nothing recorded, the learner is not blamed', crashed.outcome === 'EVALUATION_ERROR' && crashed.recorded === null && /nothing has been marked wrong/i.test(crashed.feedback), JSON.stringify(crashed).slice(0, 240));
+    await api('POST', '/api/test/faults', { formula: 'cache' });
+    const cached = await submit('=B2*C2*1.5');
+    check('FORMULA: the AST cache fails -> EVALUATION_ERROR, nothing recorded', cached.outcome === 'EVALUATION_ERROR' && cached.recorded === null, JSON.stringify(cached).slice(0, 200));
+    await api('POST', '/api/test/faults', { formula: 'ok' });
+    check('FORMULA: none of the unchecked answers became attempts', (await count()) === c1, `${c1} -> ${await count()}`);
+    check('FORMULA: the checked ones did (doubled =, auto-closed bracket, syntax mistake)', c1 >= c0 + 3, `${c0} -> ${c1}`);
+    const back = await submit(p2Model);
+    check('FORMULA: after the faults are cleared, the same task is checked normally again', back.outcome === 'CORRECT' && back.method === 'engine', JSON.stringify(back).slice(0, 160));
+    const alive = await api('GET', '/api/health');
+    check('FORMULA: the server stayed up through every injected failure', alive.status === 200);
+  }
   const sqlRight = (await api('POST', '/api/items/sql-joins-p1/submit', { answer: (await reveal('sql-joins-p1')).sql, source: 'practice' })).json;
   const sqlWrong = (await api('POST', '/api/items/sql-joins-p2/submit', { answer: 'SELECT 1 AS x', source: 'practice' })).json;
   check('GRADING: correct SQL -> CORRECT, incorrect SQL -> INCORRECT', sqlRight.outcome === 'CORRECT' && sqlWrong.outcome === 'INCORRECT', `${sqlRight.outcome} ${sqlWrong.outcome}`);
