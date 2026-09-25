@@ -27,6 +27,8 @@ import * as analyst from './analyst.js';
 import { adaptFor, guidanceNote } from './adaptive.js';
 import { milestones } from './milestones.js';
 import { guardServerDataDir } from './safety.js';
+import { PLACEMENT_TOOLS, PLACEMENT_STAGES } from './content/placement.js';
+import { COMPETENCY_MAP, CONCEPT_COMPETENCY } from './content/competencies.js';
 
 const APP = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DATA = process.env.ACADEMY_DATA ? path.resolve(process.env.ACADEMY_DATA) : path.join(APP, 'data');
@@ -149,7 +151,8 @@ app.get('/api/home', wrap((req, res) => {
     today: plan ? (() => { const x = planWithStates(engine.todayPlan()); return { steps: x.steps.length, done: x.steps.filter((st) => st.done).length }; })() : null,
     unfinished: unfinishedLinks(6),
     milestones: (() => { const m = milestones(); return { achieved: m.achieved, total: m.list.length, next: m.next, awarded: m.awarded.map((id) => m.list.find((x) => x.id === id)?.name || id) }; })(),
-    analyst: (() => { const l = analyst.listTasks(); const rec = l.tasks.find((t) => t.recommended); return { assessment: l.assessment, recommended: rec ? { id: rec.id, title: rec.title, levelName: rec.levelName, from: rec.from } : null }; })(),
+    analyst: (() => { const l = analyst.listTasks(); const rec = l.tasks.find((t) => t.recommended); return { assessment: l.assessment, readiness: analyst.readiness(), recommended: rec ? { id: rec.id, title: rec.title, levelName: rec.levelName, from: rec.from } : null }; })(),
+    phase: engine.learnerPhase(),
     focusAdapt: (() => { const a = adaptFor(topic.id); return a && a.message ? { mode: a.mode, message: a.message } : null; })(),
   });
 }));
@@ -242,65 +245,145 @@ app.get('/api/session/resume', wrap((req, res) => {
   res.json({ place: workstate.lastPlace(), unfinished: workstate.unfinished(30).filter((w) => describeWork(w)), links: unfinishedLinks(12) });
 }));
 
-// ------------------------------------------------------------------ placement assessment
+// ------------------------------------------------------------------ placement: "what do I already know?"
+// Adaptive, one question at a time (see content/placement.js): the learner first says which tools
+// they have used; "never" skips a tool. Each tool starts with the basics and goes further only while
+// answers are right. "I haven't learned this yet" (answer 'idk') is never recorded as a wrong answer.
+const PLACEMENT_ORDER = ['excel', 'sql', 'pq', 'pbi', 'think'];
+const AREA_NAME = { excel: 'Excel', sql: 'SQL', pq: 'Power Query', pbi: 'Power BI', think: 'Analyst Thinking' };
+const IDK = 'idk';
+const placementItem = (id) => content.placement.find((q) => q.id === id);
+async function placementRight(q, answer) {
+  if (answer === undefined || answer === null || answer === IDK) return false;
+  return !!(await gradeSafely(q, toStoredAnswer(q, answer))).correct;
+}
+
+/**
+ * Walks the check with the answers so far: per area the stages passed, where it stopped, and the
+ * next question to ask (or none when the check is complete).
+ */
+async function placementPlan(selfReport = {}, answers = {}, { finish = false } = {}) {
+  const areas = {};
+  let next = null;
+  let asked = 0;
+  for (const area of PLACEMENT_ORDER) {
+    const a = { area, name: AREA_NAME[area], reported: selfReport[area] || null, passed: [], stoppedAt: null, skipped: false };
+    areas[area] = a;
+    if (area !== 'think' && a.reported === 'never') { a.skipped = true; continue; }
+    for (const stage of PLACEMENT_STAGES[area]) {
+      const qs = stage.ids.map(placementItem);
+      const pending = qs.find((q) => !(q.id in answers));
+      if (pending && !finish) {
+        if (!next) next = { q: pending, area, stage: stage.tier };
+        a.pending = true;
+        break;
+      }
+      let right = 0;
+      for (const q of qs) if (await placementRight(q, answers[q.id])) right++;
+      asked += qs.length;
+      if (right >= stage.pass) a.passed.push(stage.tier);
+      else { a.stoppedAt = stage.tier; break; }
+    }
+    if (next) break;
+  }
+  return { areas, next, asked };
+}
+
+const STAGE_WORDS = { Basics: 'the basics', Beginner: 'beginner questions', Intermediate: 'intermediate questions', Advanced: 'advanced questions' };
+function roadmapOf(a) {
+  const topicTiers = a.passed.filter((t) => t !== 'Basics');
+  if (a.skipped) {
+    return { start: 'Not started', text: a.area === 'pbi' ? 'Not started yet: begins with "What Power BI is". Nothing to know in advance.' : `New to you: starts at the very first ${a.name} lesson.` };
+  }
+  if (a.area === 'pbi') {
+    return a.passed.includes('Basics')
+      ? { start: 'Beginner', text: 'You know what Power BI is for: the first topic is credited, and the path continues with getting data in.' }
+      : { start: 'Beginner', text: 'Begins with "What Power BI is".' };
+  }
+  if (!a.passed.includes('Basics')) return { start: 'Beginner', text: `Starts at the very first ${a.name} lesson.` };
+  if (!topicTiers.length) return { start: 'Beginner', text: `You know the basics: starts at the ${a.name} beginner topics.` };
+  const tiers = ['Beginner', 'Intermediate', 'Advanced'];
+  const lastIdx = tiers.indexOf(topicTiers[topicTiers.length - 1]);
+  const start = tiers[Math.min(lastIdx + 1, tiers.length - 1)];
+  const text = lastIdx >= tiers.length - 1 || !PLACEMENT_STAGES[a.area].some((s) => s.tier === tiers[lastIdx + 1])
+    ? `${topicTiers.join(' and ')} topics credited: they come back as short reviews to confirm them.`
+    : `${topicTiers.join(' and ')} topics credited: starts at ${start}. They come back as short reviews to confirm them.`;
+  return { start, text };
+}
+
 app.get('/api/placement', wrap((req, res) => {
-  res.json({ questions: content.placement.map(clientItem) });
+  res.json({ tools: PLACEMENT_TOOLS, version: 2, idk: IDK, questions: content.placement.map(clientItem) });
+}));
+
+// the next question, given what the learner said and answered so far (nothing is recorded here)
+app.post('/api/placement/next', wrap(async (req, res) => {
+  const { areas, next, asked } = await placementPlan(req.body.selfReport || {}, req.body.answers || {});
+  if (!next) return res.json({ done: true, asked });
+  res.json({
+    done: false, number: Object.keys(req.body.answers || {}).length + 1,
+    area: next.area, areaName: AREA_NAME[next.area], stage: next.stage, stageWords: STAGE_WORDS[next.stage],
+    question: { ...clientItem(next.q), idkLabel: "I haven't learned this yet" },
+    // the tools in order, with where the check is: done, now, still to come, or skipped
+    areas: PLACEMENT_ORDER.map((id) => ({ area: id, name: AREA_NAME[id],
+      state: id !== 'think' && (req.body.selfReport || {})[id] === 'never' ? 'skipped' : id === next.area ? 'now' : areas[id] ? 'done' : 'later' })),
+  });
 }));
 
 app.post('/api/placement', wrap(async (req, res) => {
+  const selfReport = req.body.selfReport || {};
   const answers = req.body.answers || {};
-  const bySkillTier = {};
+  const { areas } = await placementPlan(selfReport, answers, { finish: true });
   const results = [];
-  for (const q of content.placement) {
-    const r = await gradeSafely(q, toStoredAnswer(q, answers[q.id]));
-    results.push({ id: q.id, correct: r.correct, outcome: r.outcome });
-    const k = `${q.area}|${q.tier}`;
-    bySkillTier[k] ||= { correct: 0, total: 0 };
-    bySkillTier[k].total++;
-    if (r.correct) bySkillTier[k].correct++;
-    engine.recordAttempt({ itemId: q.id, topicId: null, skillId: q.area, source: 'placement', rawScore: r.correct ? 1 : 0, concept: q.concept, noMistake: true });
+  // only real answers are evidence; "I haven't learned this yet" and unasked questions are not
+  for (const [id, answer] of Object.entries(answers)) {
+    const q = placementItem(id);
+    if (!q || answer === IDK || answer === null || answer === undefined) continue;
+    const correct = await placementRight(q, answer);
+    results.push({ id, correct });
+    engine.recordAttempt({ itemId: q.id, topicId: null, skillId: q.area, source: 'placement', rawScore: correct ? 1 : 0, concept: q.concept, noMistake: true });
   }
-  // credit tiers that were passed (2/3 or better), so the path starts at the right place
   const roadmap = {};
+  const roadmapText = {};
   const passed = {};
-  const tiers = ['Beginner', 'Intermediate', 'Advanced'];
-  for (const area of ['excel', 'sql', 'pq', 'think']) {
-    let stage = 'Beginner';
-    passed[area] = [];
-    for (const tier of tiers) {
-      const r = bySkillTier[`${area}|${tier}`];
-      if (!r) break;
-      if (r.correct / r.total >= 0.66) {
-        passed[area].push(tier);
-        // a small starting credit (capped at 30% per topic) and the topics are opened
-        for (const t of content.topics.filter((x) => x.skill === area && x.level === tier)) {
-          engine.recordAttempt({ itemId: `placement:${t.id}`, topicId: t.id, skillId: area, source: 'placement', rawScore: 1, noMistake: true });
-          engine.unlockTopic(t.id);
-        }
-        const idx = tiers.indexOf(tier);
-        stage = tiers[Math.min(idx + 1, tiers.length - 1)];
-        // the next tier opens too, so the path continues from here
-        for (const t of content.topics.filter((x) => x.skill === area && x.level === tiers[idx + 1])) engine.unlockTopic(t.id);
-      } else { stage = tier; break; }
+  for (const a of Object.values(areas)) {
+    const r = roadmapOf(a);
+    roadmap[a.area] = r.start;
+    roadmapText[a.area] = r.text;
+    passed[a.area] = a.passed.filter((t) => t !== 'Basics');
+    // a small starting credit (capped at 30% per topic) for every tier passed; its topics open,
+    // and so does the next tier's
+    const credited = a.area === 'pbi'
+      ? (a.passed.includes('Basics') ? content.topics.filter((t) => t.id === 'pbi-intro') : [])
+      : content.topics.filter((t) => t.skill === a.area && passed[a.area].includes(t.level));
+    for (const t of credited) {
+      engine.recordAttempt({ itemId: `placement:${t.id}`, topicId: t.id, skillId: a.area, source: 'placement', rawScore: 1, noMistake: true });
+      engine.unlockTopic(t.id);
     }
-    roadmap[area] = stage;
+    const tiers = ['Beginner', 'Intermediate', 'Advanced'];
+    const last = passed[a.area][passed[a.area].length - 1];
+    if (last) for (const t of content.topics.filter((x) => x.skill === a.area && x.level === tiers[tiers.indexOf(last) + 1])) engine.unlockTopic(t.id);
   }
-  roadmap.pbi = 'Not started';
   // credited topics come back as short review questions over the next days
   engine.schedulePlacementReviews(content.topics.filter((t) => (passed[t.skill] || []).includes(t.level)).map((t) => t.id));
-  const score = (a) => { const t = tiers.map((x) => bySkillTier[`${a}|${x}`]).filter(Boolean); return t.reduce((s, x) => s + x.correct, 0) / Math.max(1, t.reduce((s, x) => s + x.total, 0)); };
-  const clean = bySkillTier['clean|Beginner'] ? bySkillTier['clean|Beginner'] : null;
-  // start with the weakest of the core tools
-  const order = ['sql', 'excel', 'pq'];
-  const startSkill = order.slice().sort((a, b) => score(a) - score(b))[0];
-  const placement = { at: nowIso(), roadmap, passed, startSkill, scores: { excel: score('excel'), sql: score('sql'), pq: score('pq'), think: score('think'), clean: clean ? clean.correct / clean.total : null }, results };
+  const score = (area) => {
+    const mine = results.filter((r) => placementItem(r.id).area === area);
+    return mine.length ? mine.filter((r) => r.correct).length / mine.length : 0;
+  };
+  // start with the first core tool whose beginner topics are not yet credited (Excel for a newcomer),
+  // otherwise with the weakest of the three
+  const core = ['excel', 'sql', 'pq'];
+  const startSkill = core.find((a) => !passed[a].includes('Beginner')) || core.slice().sort((a, b) => score(a) - score(b))[0];
+  const placement = { at: nowIso(), version: 2, selfReport, roadmap, roadmapText, passed, startSkill,
+    scores: Object.fromEntries(PLACEMENT_ORDER.map((a) => [a, score(a)])), results };
   store.run('UPDATE profile SET onboarded = 1, placement_json = ? WHERE id = 1', [JSON.stringify(placement)]);
   const start = engine.nextTopicInSkill(startSkill);
   res.json({ ...placement, startTopic: start ? { id: start.id, title: start.title, skill: content.skillMap[startSkill].name } : null });
 }));
 
 app.post('/api/placement/skip', wrap((req, res) => {
-  const placement = { at: nowIso(), skipped: true, roadmap: { excel: 'Beginner', sql: 'Beginner', pq: 'Beginner', think: 'Beginner', pbi: 'Not started' }, startSkill: 'excel' };
+  const first = (name) => `Starts at the very first ${name} lesson.`;
+  const placement = { at: nowIso(), skipped: true, roadmap: { excel: 'Beginner', sql: 'Beginner', pq: 'Beginner', think: 'Beginner', pbi: 'Not started' },
+    roadmapText: { excel: first('Excel'), sql: first('SQL'), pq: first('Power Query'), think: first('Analyst Thinking'), pbi: 'Not started yet: begins with "What Power BI is".' }, startSkill: 'excel' };
   store.run('UPDATE profile SET onboarded = 1, placement_json = ? WHERE id = 1', [JSON.stringify(placement)]);
   res.json(placement);
 }));
@@ -1063,6 +1146,26 @@ app.post('/api/projects/:id/steps/:step/hint', wrap((req, res) => {
 }));
 
 // ------------------------------------------------------------------ progress
+// "At a glance" on the Progress page: what the learner is learning now, getting better at, should
+// practise more, and what comes next, in plain words. The detail stays below it.
+function progressGlance() {
+  const f = engine.focus();
+  const topic = content.topicMap[f.topicId];
+  const since = new Date(Date.now() - 14 * 86400000).toISOString();
+  const recent = store.all("SELECT concept, COUNT(*) AS n FROM attempts WHERE source NOT IN ('placement', 'card') AND ts >= ? AND raw_score >= 0.8 AND concept IS NOT NULL GROUP BY concept", [since]);
+  const byAbility = {};
+  for (const r of recent) { const c = CONCEPT_COMPETENCY[r.concept]; if (c) byAbility[c] = (byAbility[c] || 0) + r.n; }
+  const bestId = Object.entries(byAbility).sort((a, b) => b[1] - a[1])[0]?.[0];
+  const better = bestId ? COMPETENCY_MAP[bestId] : null;
+  const weak = engine.weaknesses()[0] || null;
+  return {
+    learning: { skill: content.skillMap[topic.skill].name, topic: topic.title, topicId: topic.id },
+    betterAt: better ? { name: better.name, skill: content.skillMap[better.skill]?.name || null } : null,
+    practiseMore: weak ? { title: weak.title, topicId: weak.topicId, why: weak.why } : null,
+    next: { title: topic.title, reason: f.reason, to: `/topic/${topic.id}` },
+  };
+}
+
 app.get('/api/progress', wrap((req, res) => {
   const attempts = store.get('SELECT COUNT(*) AS n, SUM(correct) AS c FROM attempts WHERE source NOT IN (\'placement\', \'card\')');
   const days = store.all("SELECT substr(ts,1,10) AS d, COUNT(*) AS n FROM attempts WHERE source <> 'placement' GROUP BY 1 ORDER BY 1 DESC LIMIT 28");
@@ -1077,6 +1180,7 @@ app.get('/api/progress', wrap((req, res) => {
     topics: content.topics.map((t) => ({ id: t.id, title: t.title, skill: t.skill, level: t.level, ...engine.topicStatus(t), stage: mastery.topicView(t.id).stage, stageLabel: mastery.topicView(t.id).stageLabel })),
     mastery: mastery.masterySummary(),
     milestones: milestones(),
+    glance: progressGlance(),
   });
 }));
 
@@ -1090,7 +1194,7 @@ app.get('/api/mastery/topic/:id', wrap((req, res) => {
 app.get('/api/milestones', wrap((req, res) => res.json(milestones())));
 
 // ------------------------------------------------------------------ Real Analyst mode
-app.get('/api/analyst', wrap((req, res) => res.json(analyst.listTasks())));
+app.get('/api/analyst', wrap((req, res) => res.json({ ...analyst.listTasks(), readiness: analyst.readiness() })));
 app.get('/api/analyst/:id', wrap((req, res) => {
   const t = content.analystMap[req.params.id];
   if (!t) return res.status(404).json({ error: 'Unknown task' });

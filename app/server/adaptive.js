@@ -5,6 +5,11 @@
 //   apply       the ideas and the syntax are there, business use is not   → scenario and interpretation questions
 //   steady      none of the above                                         → questions that fit the current stage
 //
+// Cold start (coldStart: true): fewer than 6 checked answers in the topic, still at an early stage,
+// and no run of three right answers yet. A handful of answers is not enough to judge, so questions
+// stay close to the basics and plain (engine.questionWeight). It ends by itself: after 6 answers,
+// or as soon as three in a row are right (then step-up applies and harder work arrives).
+//
 // It also decides how much guidance a practice task or challenge offers:
 //   full    hints available from the start
 //   light   hints open after the first check (guided tasks have been solved with little help)
@@ -67,6 +72,8 @@ export function adaptFor(topicId, view = null) {
       message: 'You know how this works. What is missing is using it on a business problem, so more questions now describe a situation and ask you to decide.',
     });
   }
+
+  out.coldStart = out.mode !== 'step-up' && last.length < 6 && ['none', 'introduced', 'learning'].includes(v.stage);
 
   // Guidance: once guided tasks are solved with little help, the help steps back too.
   if (out.mode !== 'step-back') {

@@ -276,6 +276,19 @@ export function weaknesses() {
 }
 
 // ------------------------------------------------------------------ what next
+// ------------------------------------------------------------------ how well the app knows the learner
+// new           nothing checked yet
+// calibrating   fewer than CALIBRATION_ANSWERS checked answers: "Getting to know your level".
+//               Everything stays close to the basics, and advanced work is not suggested yet.
+// personalized  enough evidence for the adaptive rules to decide on their own
+// Placement answers only say where to start; they are not evidence of how the learner works.
+export const CALIBRATION_ANSWERS = 25;
+export function learnerPhase() {
+  const r = store.get("SELECT COUNT(*) AS n FROM attempts WHERE source NOT IN ('placement', 'card')");
+  const answers = r?.n || 0;
+  return { phase: answers === 0 ? 'new' : answers < CALIBRATION_ANSWERS ? 'calibrating' : 'personalized', answers, needed: CALIBRATION_ANSWERS };
+}
+
 const ACTIVE_ORDER = ['excel', 'sql', 'pq', 'pbi'];
 
 export function nextTopicInSkill(skillId) {
@@ -320,7 +333,19 @@ export function focus() {
   // first day: start where the placement said
   if (placement?.startSkill && !store.get("SELECT 1 AS x FROM attempts WHERE source NOT IN ('placement') LIMIT 1")) {
     const t = nextTopicInSkill(placement.startSkill);
-    if (t) return { topicId: t.id, mode: 'learn', reason: `Your assessment showed this is the best place to start.` };
+    if (t) {
+      const reason = placement.skipped
+        ? `Start here: the first ${content.skillMap[t.skill].name} topic. Everything after it builds on it.`
+        : 'Your assessment showed this is the best place to start.';
+      return { topicId: t.id, mode: 'learn', reason };
+    }
+  }
+  // while the app is getting to know the learner: stay with the topic in hand until it is done,
+  // instead of rotating to another tool after the first answers (a new learner lost the thread)
+  if (learnerPhase().phase !== 'personalized') {
+    const last = store.get("SELECT topic_id FROM attempts WHERE source NOT IN ('placement', 'card') AND topic_id IS NOT NULL ORDER BY ts DESC, id DESC LIMIT 1")?.topic_id;
+    const t = last && content.topicMap[last];
+    if (t && isUnlocked(t) && topicMastery(t.id) < 80) return { topicId: t.id, mode: 'continue', reason: `Keep going with ${t.title}: finish its practice and quiz before moving on.` };
   }
   // rotate: the active skill practised least recently, then its next topic
   const ordered = skills.slice().sort((a, b) => (lastPracticed(a) < lastPracticed(b) ? -1 : lastPracticed(a) > lastPracticed(b) ? 1 : ACTIVE_ORDER.indexOf(a) - ACTIVE_ORDER.indexOf(b)));
@@ -409,8 +434,14 @@ export function questionWeight(it, h, recent, week, weakConcepts, mastery, now =
   else if (week.has(it.id)) w *= 0.5;
   const target = adapt ? adapt.target : mastery < 35 ? 1.5 : mastery < 70 ? 2.5 : 3.2;     // difficulty that fits the learner
   if (Math.abs((it.difficulty || 2) - target) > 1.2) w *= 0.6;
+  const dim = adapt ? dimensionOf(it.source || 'quiz', kindOf(it), !!metaOf(it)?.business_context) : null;
+  // getting to know the learner (adaptive.js coldStart): basics first, plain questions before
+  // business situations. Harder ones are only drawn when nothing easier is left.
+  if (adapt && adapt.coldStart) {
+    if ((it.difficulty || 2) > 2) w *= 0.05;
+    if (dim === 'application') w *= 0.4;
+  }
   if (adapt && adapt.prefer) {
-    const dim = dimensionOf(it.source || 'quiz', kindOf(it), !!metaOf(it)?.business_context);
     const m = adapt.prefer[dim] || 1;
     w *= m;
     if (m > 1 && (reason === 'practice' || reason === 'known' || reason === 'due-for-review')) reason = adapt.mode;
@@ -569,10 +600,14 @@ export function todayPlan(forceNew = false) {
   // up to 2 review questions (mistakes, due topics), the rest from today's topic, 5 in total
   const extra = reviewQuestions(2, new Set((topic.quiz || []).map((q) => q.id)));
   const quiz = pickQuiz(topic, 5 - extra.length);
+  // The day's challenge is this topic's own, once its basics are in place. There used to be a
+  // fallback to an Analyst Thinking challenge picked by the day of the month, which put an
+  // unrelated and often demanding data task into a brand-new learner's first plan. Now only a
+  // learner the app knows well gets a thinking challenge instead, from their own next thinking topic.
   let challenge = topic.challenge && (st.lessonDone || st.mastery >= 40) ? topic.challenge : null;
-  if (!challenge) {
-    const think = content.topics.filter((t) => t.skill === 'think' && t.challenge);
-    challenge = think.length ? think[new Date().getDate() % think.length].challenge : null;
+  if (!challenge && learnerPhase().phase === 'personalized') {
+    const t = nextTopicInSkill('think');
+    if (t && t.challenge && isUnlocked(t)) challenge = t.challenge;
   }
   const plan = {
     day, topicId: topic.id, topicTitle: topic.title, skill: topic.skill, skillName: content.skillMap[topic.skill].name, level: topic.level,
@@ -600,7 +635,16 @@ export function markPlanStep(step) {
 /** One useful exercise for a short session. */
 export function quickItem() {
   const kinds = new Set(['formula', 'sql', 'mc', 'fill', 'number', 'tf']);
-  const pool = content.quizItems.filter((i) => kinds.has(i.type) && isUnlocked(content.topicMap[i.topicId]));
+  let pool = content.quizItems.filter((i) => kinds.has(i.type) && isUnlocked(content.topicMap[i.topicId]));
+  // while the app is getting to know the learner: only the current topic and topics already
+  // practised, and the easier questions (an unlocked topic is not a practised one)
+  if (learnerPhase().phase !== 'personalized') {
+    const current = focus().topicId;
+    const practised = new Set(store.all("SELECT DISTINCT topic_id FROM attempts WHERE source NOT IN ('placement', 'card') AND topic_id IS NOT NULL").map((r) => r.topic_id));
+    const known = pool.filter((i) => i.topicId === current || practised.has(i.topicId));
+    const easy = known.filter((i) => (i.difficulty || 2) <= 2);
+    pool = easy.length ? easy : known.length ? known : pool;
+  }
   const weak = openMistakes(10).map((m) => m.concept);
   const fromWeak = pool.filter((i) => weak.includes(i.concept));
   const due = new Set(dueReviews().map((t) => t.id));

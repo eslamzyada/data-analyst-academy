@@ -22,7 +22,7 @@ export const PBI_BEGINNER = [
     explain: 'The skills transfer directly. Anything you can clean in Excel\'s Power Query, you clean the same way in Power BI.',
   },
   {
-    id: 'b-pbi-intro-04', topic: 'pbi-intro', type: 'mc', difficulty: 2, concept: 'pbi-basics',
+    id: 'b-pbi-intro-04', topic: 'pbi-intro', type: 'mc', difficulty: 3, concept: 'pbi-basics',
     prompt: 'What is the difference between Import and DirectQuery?',
     options: ['Import only works with Excel source files', 'Import copies the data into the model; DirectQuery queries the source live', 'DirectQuery is always the faster option', 'There is no real difference between them'],
     answer: 1,

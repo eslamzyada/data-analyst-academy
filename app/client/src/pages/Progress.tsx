@@ -25,6 +25,8 @@ export default function Progress() {
         <div className="kpi" style={{ textAlign: 'right' }}><span className="label">Topics covered</span><span className="v">{p.overall}%</span></div>
       </div>
 
+      <AtAGlance g={p.glance} />
+      <StagesExplained stages={p.mastery?.stages} />
       <Milestones m={p.milestones} />
       <WhatYouCanDo mastery={p.mastery} />
 
@@ -90,9 +92,9 @@ export default function Progress() {
         </div>
       </div>
 
-      <div className="section card">
-        <h3>Every topic</h3>
-        <div className="table-wrap" style={{ maxHeight: 440 }}>
+      <details className="section card every-topic">
+        <summary><h3 style={{ display: 'inline' }}>Show every topic</h3> <span className="small muted">stage, status and reviews for all {p.topics.length} topics</span></summary>
+        <div className="table-wrap" style={{ maxHeight: 440, marginTop: 10 }}>
           <table className="data">
             <thead><tr><th>Topic</th><th>Skill</th><th>Level</th><th>Stage</th><th>Status</th><th>Progress</th><th>Review</th></tr></thead>
             <tbody>
@@ -109,8 +111,34 @@ export default function Progress() {
             </tbody>
           </table>
         </div>
-      </div>
+      </details>
     </div>
+  );
+}
+
+// ------------------------------------------------------------------ the page in four lines
+function AtAGlance({ g }: { g: any }) {
+  if (!g) return null;
+  return (
+    <div className="card glance">
+      <div className="glance-row"><span className="label">You are learning</span><span><b>{g.learning.skill}</b> · <Link to={`/topic/${g.learning.topicId}`}>{g.learning.topic}</Link></span></div>
+      <div className="glance-row"><span className="label">Getting better at</span><span>{g.betterAt ? <><b>{g.betterAt.name}</b>{g.betterAt.skill && <span className="muted small"> ({g.betterAt.skill})</span>}</> : <span className="muted small">Not enough recent work yet: a few good answers will show it here.</span>}</span></div>
+      <div className="glance-row"><span className="label">Practise more</span><span>{g.practiseMore ? <><Link to={`/topic/${g.practiseMore.topicId}?tab=practice`}>{g.practiseMore.title}</Link> <span className="muted small">· {g.practiseMore.why}</span></> : <span className="muted small">Nothing flagged. Weak spots appear when mistakes repeat.</span>}</span></div>
+      <div className="glance-row"><span className="label">Next</span><span><Link className="btn primary sm" to={g.next.to}><Icon name="play" size={13} />{g.next.title}</Link> <span className="muted small">{g.next.reason}</span></span></div>
+    </div>
+  );
+}
+
+// ------------------------------------------------------------------ the six stages, in plain words
+function StagesExplained({ stages }: { stages: any[] }) {
+  if (!stages?.length) return null;
+  return (
+    <details className="card stages-explained">
+      <summary className="small"><b>What the stages mean</b> <span className="muted">({stages.map((s) => s.label).join(' → ')})</span></summary>
+      <div className="stack" style={{ gap: 4, marginTop: 8 }}>
+        {stages.map((s) => <div key={s.id} className="small"><b>{s.label}:</b> {s.meaning}</div>)}
+      </div>
+    </details>
   );
 }
 

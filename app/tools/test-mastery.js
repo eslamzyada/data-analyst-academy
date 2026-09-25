@@ -328,6 +328,88 @@ reset();
   ok(!milestones().list.find((x) => x.id === 'integrated-analyst').achieved, 'Integrated Data Analyst needs Real Analyst work, an assessment and projects, not one skill');
 }
 
+// ================================================================ cold start: basics first, ambition once there is evidence
+section('cold start: a brand-new learner');
+{
+  reset();
+  store.run('DELETE FROM daily_plan');
+  store.run('UPDATE profile SET onboarded = 1, placement_json = ? WHERE id = 1', [JSON.stringify({ skipped: true, roadmap: {}, startSkill: 'excel' })]);
+  ok(engine.learnerPhase().phase === 'new', 'nothing answered yet: the learner is new');
+  const xl = content.topicMap['xl-basics'];
+  put(xl.quiz[0].id, 'quiz', 1);
+  const cal = engine.learnerPhase();
+  ok(cal.phase === 'calibrating' && cal.answers === 1 && cal.needed === 25, 'after the first answers: getting to know the learner (1 of 25)', JSON.stringify(cal));
+  xl.quiz.slice(1, 25).forEach((it) => put(it.id, 'quiz', 1));
+  ok(engine.learnerPhase().phase === 'personalized', 'after 25 checked answers the adaptive rules take over');
+}
+{
+  // quizzes: a topic whose bank is mostly harder questions
+  reset();
+  const topic = content.topicMap['xl-xlookup'];
+  const hard = (items) => items.filter((i) => (i.difficulty || 2) > 2).length;
+  const bankHard = hard(topic.quiz) / topic.quiz.length;
+  const draw = (n) => {
+    let h = 0; let tot = 0; let app = 0;
+    for (let i = 0; i < n; i++) {
+      const q = engine.drawQuiz([{ topic }], 6, { mark: false, generated: false });
+      tot += q.length; h += hard(q); app += q.filter((it) => dimOf(it) === 'application').length;
+    }
+    return { share: h / tot, app: app / tot };
+  };
+  ok(adaptFor(topic.id).coldStart === true, 'a topic with no answers is in cold start');
+  const cold = draw(40);
+  ok(bankHard > 0.3 && cold.share < 0.15, `first quizzes stay basic: ${Math.round(cold.share * 100)}% harder questions drawn, although ${Math.round(bankHard * 100)}% of the bank is harder`);
+  topic.quiz.filter((i) => (i.difficulty || 2) <= 2).slice(0, 3).forEach((it) => put(it.id, 'quiz', 1));
+  const a = adaptFor(topic.id);
+  ok(a.mode === 'step-up' && !a.coldStart, 'three right in a row ends cold start at once (step-up)', JSON.stringify({ mode: a.mode, coldStart: a.coldStart }));
+  const warm = draw(40);
+  ok(warm.share > 0.3 && warm.share > cold.share * 3, `...and harder questions then arrive: ${Math.round(warm.share * 100)}% (was ${Math.round(cold.share * 100)}%). Sequencing, not a lower ceiling`);
+  ok(warm.app > cold.app, `business situations come in as evidence grows (${Math.round(cold.app * 100)}% -> ${Math.round(warm.app * 100)}%)`);
+  reset();
+  topic.quiz.slice(0, 6).forEach((it, i) => put(it.id, 'quiz', i % 2 ? 1 : 0));
+  ok(!adaptFor(topic.id).coldStart, 'six answers in a topic are enough evidence: cold start is over, whatever the results');
+}
+{
+  // today's plan: no random challenge on day one, and an honest reason
+  reset();
+  store.run('DELETE FROM daily_plan');
+  const plan = engine.todayPlan(true);
+  ok(!plan.steps.some((st) => st.key === 'challenge'), "a brand-new learner's first plan has no challenge (it used to add an Analyst Thinking challenge picked by the date)", JSON.stringify(plan.steps.map((st) => [st.key, st.itemId])));
+  ok(/Start here/.test(plan.reason) && !/assessment showed/.test(plan.reason), 'a skipped assessment is not given as the reason', plan.reason);
+  const thinkChallenges = new Set(content.topics.filter((t) => t.skill === 'think' && t.challenge).map((t) => t.challenge.id));
+  const planned = plan.steps.flatMap((st) => [st.itemId, ...(st.itemIds || [])]).filter(Boolean);
+  ok(!planned.some((id) => thinkChallenges.has(id)), 'nothing from Analyst Thinking challenges on day one');
+  const first = content.items[plan.steps.find((st) => st.key === 'practice')?.itemId];
+  ok(first && (first.difficulty || 2) <= 2, 'the first practice task is an easy one', JSON.stringify(first && [first.id, first.difficulty]));
+  const qi = engine.quickItem();
+  ok(qi && qi.topicId === engine.focus().topicId && (qi.difficulty || 2) <= 2, 'quick practice for a new learner: the current topic, an easier question', JSON.stringify(qi && [qi.id, qi.topicId, qi.difficulty]));
+}
+{
+  // Real Analyst: suggested when the learner is ready, never locked
+  reset();
+  let r = analyst.readiness();
+  ok(!r.ready && /deep end/.test(r.why || ''), 'a new learner is not pointed at Real Analyst work, and is told why in plain words', JSON.stringify(r));
+  content.topicMap['xl-basics'].quiz.slice(0, 25).forEach((it) => put(it.id, 'quiz', 1));
+  r = analyst.readiness();
+  ok(!r.ready && /business challenge/.test(r.why || ''), '25 answers are not enough on their own: a first business challenge is needed too', JSON.stringify(r));
+  const ch = content.topics.find((t) => t.skill === 'excel' && t.challenge).challenge;
+  put(ch.id, 'challenge', 1);
+  ok(analyst.readiness().ready, 'with a challenge solved, Real Analyst work is suggested');
+  ok(analyst.listTasks().tasks.length > 0, 'the Real Analyst tasks stay available the whole time (suggested, not locked)');
+}
+{
+  // Power BI from zero
+  reset();
+  const path = content.topics.filter((t) => t.skill === 'pbi').map((t) => t.id);
+  ok(engine.nextTopicInSkill('pbi')?.id === 'pbi-intro', 'Power BI starts at "What Power BI is"');
+  const at = (id) => path.indexOf(id);
+  ok(at('pbi-import') < at('pbi-model') && at('pbi-model') < at('pbi-visuals') && at('pbi-visuals') < at('pbi-reports') && at('pbi-reports') < at('pbi-star') && at('pbi-reports') < at('pbi-dax'),
+    'Power BI path: what it is, getting data in, how tables connect, a first simple report, and only then star schemas and DAX', path.join(' > '));
+  const intro = content.topicMap['pbi-intro'];
+  const qs = []; for (let i = 0; i < 20; i++) qs.push(...engine.drawQuiz([{ topic: intro }], 6, { mark: false, generated: false }));
+  ok(qs.filter((q) => (q.difficulty || 2) > 2).length / qs.length < 0.1, 'a first Power BI quiz stays introductory (DAX and Import-vs-DirectQuery wait)');
+}
+
 store.flushNow();
 fs.rmSync(dir, { recursive: true, force: true });
 console.log(`\n${pass}/${pass + failures.length} checks passed.`);
