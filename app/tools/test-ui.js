@@ -19,7 +19,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let server = null;
 let serverOut = '';
 function startServer() {
-  server = spawn(process.execPath, ['server/index.js'], { cwd: APP, env: { ...process.env, PORT: String(PORT), ACADEMY_DATA: tmp, ACADEMY_REQUIRE_TEST_DATA: '1' }, stdio: ['ignore', 'pipe', 'pipe'] });
+  server = spawn(process.execPath, ['server/index.js'], { cwd: APP, env: { ...process.env, PORT: String(PORT), ACADEMY_DATA: tmp, ACADEMY_REQUIRE_TEST_DATA: '1', ACADEMY_TEST_FAULTS: '1' }, stdio: ['ignore', 'pipe', 'pipe'] });
   server.stdout.on('data', (d) => { serverOut += d; });
   server.stderr.on('data', (d) => { serverOut += d; });
 }
@@ -349,6 +349,96 @@ const scenarios = {
     await b.reload();
     await b.waitFor(`!!document.querySelector('#part-decide')`, { label: 'still open after refresh', timeout: 5000 }).catch(() => {});
     check('analyst: the verdict and the open part survive a refresh', await b.evaluate(`/Best fit/.test(document.querySelector('#part-tools')?.innerText || '') && !!document.querySelector('#part-decide')`));
+  },
+
+  // ------------------------------------------------------------ SQL Lab, as a first-time SQL learner
+  async sqllab(b) {
+    const editorText = () => b.evaluate(`document.querySelector('.cm-content')?.innerText || ''`);
+    const setEditor = (text) => b.evaluate(`(() => { const el = document.querySelector('.cm-content'); el.focus(); document.execCommand('selectAll'); document.execCommand('insertText', false, ${JSON.stringify(text)}); return true; })()`);
+    const runQuery = async () => { await b.click('Run query'); await sleep(600); };
+    const header = () => b.evaluate(`document.querySelector('.db-header')?.innerText || ''`);
+    await b.goto(`${BASE}/#/sql`);
+    await b.waitFor(`!!document.querySelector('.db-header') && !!document.querySelector('.cm-content')`, { label: 'SQL Lab', timeout: 10000 });
+    const h = await header();
+    check('sqllab: the database is named at the top', /DATABASE/i.test(h) && /Cedarline Outdoor Supply/.test(h), h.slice(0, 200));
+    check('sqllab: its status is shown (Connected)', /Connected/.test(h), h.slice(0, 200));
+    check('sqllab: the SQL dialect is shown (SQLite)', /SQL dialect:\s*SQLite 3\.\d+/.test(h), h.slice(0, 300));
+    check('sqllab: it says how to write a query here (no database name needed)', /no database name/i.test(h), h.slice(0, 300));
+    const tables = await b.evaluate(`[...document.querySelectorAll('.db-header .chip')].map((c) => c.textContent)`);
+    check('sqllab: the tables are listed', ['customers', 'orders', 'products'].every((t) => tables.includes(t)), JSON.stringify(tables));
+    await b.click('View schema');
+    await b.waitFor(`!!document.querySelector('.drawer') && /orders/.test(document.querySelector('.drawer').innerText)`, { label: 'schema drawer' });
+    await b.evaluate(`[...document.querySelectorAll('.drawer b.mono')].find((x) => x.textContent === 'orders').click()`);
+    await sleep(200);
+    const drawer = await b.evaluate(`document.querySelector('.drawer').innerText`);
+    check('sqllab: the schema shows a table\'s columns with their types and connections', /order_id/.test(drawer) && /customer_id/.test(drawer) && /integer|text|real/i.test(drawer) && /Connects to/.test(drawer), drawer.slice(0, 400));
+    await b.evaluate(`document.querySelector('.drawer-bg')?.click()`);
+    check('sqllab: a first visit starts with an explained example, not a blank editor', /SELECT \*/.test(await editorText()) && /first 10 rows/.test(await b.text()), await editorText());
+    await runQuery();
+    const rows = await b.evaluate(`document.querySelectorAll('.main table.data tbody tr').length`);
+    check('sqllab: running the example shows rows', rows === 10, String(rows));
+
+    await setEditor('SELECT * FROM orders2');
+    await runQuery();
+    await b.waitFor(`!!document.querySelector('.sql-error-card')`, { label: 'friendly error', timeout: 6000 }).catch(() => {});
+    const err = await b.evaluate(`(() => { const e = document.querySelector('.sql-error-card'); return e ? { kind: e.dataset.kind, text: e.innerText, chips: e.querySelectorAll('.chip').length } : null; })()`);
+    check('sqllab: an unknown table gives a friendly error naming it, with the real tables and the likely one', err && err.kind === 'unknown-table' && /orders2/.test(err.text) && /Did you mean/.test(err.text) && err.chips >= 5, JSON.stringify(err));
+    check('sqllab: ...with an example and a way back to the editor', err && /Example/.test(err.text) && /Back to the editor/.test(err.text), err && err.text);
+    await b.click('Back to the editor');
+    await setEditor('SELECT customer_id, full_name FROM customers ORDER BY customer_id LIMIT 5;');
+    await runQuery();
+    const rows2 = await b.evaluate(`document.querySelectorAll('.main table.data tbody tr').length`);
+    check('sqllab: after the error, a correct query runs normally', rows2 === 5 && !(await b.evaluate(`!!document.querySelector('.sql-error-card')`)), String(rows2));
+
+    // the crash that blanked the whole Academy: a binary value in a result
+    await setEditor('SELECT randomblob(4) AS b');
+    await runQuery();
+    const blob = await b.evaluate(`({ root: document.getElementById('root').innerHTML.length, cell: document.querySelector('.main table.data tbody td')?.textContent || '' })`);
+    check('sqllab: a binary value in a result is shown as a label and the Academy stays on screen', blob.root > 1000 && /binary data, 4 bytes/.test(blob.cell), JSON.stringify(blob));
+    await setEditor('SELECT * FROM orders WHERE 1 = 0');
+    await runQuery();
+    check('sqllab: a query with no rows says so plainly', /No rows matched/.test(await b.text()));
+
+    // the rest of the Academy still works, and the query is still there on return
+    await b.route('#/');
+    await b.waitFor(`/Your skills/.test(document.body.innerText)`, { label: 'home after SQL Lab', timeout: 8000 }).catch(() => {});
+    check('sqllab: the rest of the Academy keeps working', /Your skills/.test(await b.text()));
+    await b.route('#/sql');
+    await b.waitFor(`/WHERE 1 = 0/.test(document.querySelector('.cm-content')?.innerText || '')`, { label: 'query kept', timeout: 6000 }).catch(() => {});
+    check('sqllab: the query is still there after leaving and coming back', /WHERE 1 = 0/.test(await editorText()), await editorText());
+
+    // an unknown database name in the link never breaks the page
+    await b.goto(`${BASE}/#/sql?db=no-such-db`);
+    await b.waitFor(`!!document.querySelector('.db-header')`, { label: 'fallback database', timeout: 8000 }).catch(() => {});
+    check('sqllab: a link to an unknown database falls back to a real one, with a note', /There is no practice database called "no-such-db"/.test(await b.text()) && /Cedarline/.test(await header()), (await b.text()).slice(0, 300));
+
+    // the practice database becomes unavailable: the problem stays in the result area
+    await api('POST', '/api/test/sql-faults', { sql: 'missing' });
+    await setEditor('SELECT * FROM customers LIMIT 3');
+    await runQuery();
+    const down = await b.evaluate(`document.querySelector('.sql-error-card')?.dataset.kind || ''`);
+    check('sqllab: an unavailable practice database is reported as such, not as the learner\'s mistake', down === 'unavailable' && /unavailable/i.test(await b.text()) && /not with your query/.test(await b.text()), down);
+    await api('POST', '/api/test/sql-faults', { sql: 'ok' });
+
+    // an SQL task says which database it uses
+    await b.goto(`${BASE}/#/task/sql-joins-p1`);
+    await b.waitFor(`!!document.querySelector('.sql-task-context .chip')`, { label: 'SQL task context', timeout: 8000 }).catch(() => {});
+    const ctx = await b.evaluate(`document.querySelector('.sql-task-context')?.innerText || ''`);
+    check('sqllab: an SQL task names its database, the dialect and its tables', /Cedarline Outdoor Supply/.test(ctx) && /SQLite/.test(ctx) && /orders/.test(ctx), ctx.slice(0, 200));
+  },
+
+  // ------------------------------------------------------------ one page failing never blanks the Academy
+  async pageerror(b) {
+    await api('POST', '/api/test/break-api', { path: '/api/home' });
+    await b.goto(`${BASE}/#/`);
+    await b.waitFor(`/Something went wrong on this page/.test(document.body.innerText)`, { label: 'page error message', timeout: 8000 }).catch(() => {});
+    const t = await b.text('body');
+    check('pageerror: a page that receives nonsense shows a friendly message', /Something went wrong on this page/.test(t) && /progress are safe/.test(t), t.slice(0, 300));
+    check('pageerror: the menu is still there', await b.evaluate(`!!document.querySelector('.sidebar nav a[href="#/learn"]')`));
+    await api('POST', '/api/test/break-api', { path: '/api/home', on: false });
+    await b.click('Learn', { within: '.sidebar' });
+    await b.waitFor(`/Excel/i.test(document.querySelector('.main')?.innerText || '') && !/Something went wrong/.test(document.body.innerText)`, { label: 'learn after error', timeout: 8000 }).catch(() => {});
+    check('pageerror: moving to another page works normally again', !/Something went wrong/.test(await b.text('body')) && /Excel/i.test(await b.text()));
   },
 
   // ------------------------------------------------------------ the placement check (runs last: it resets progress)

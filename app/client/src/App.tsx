@@ -17,6 +17,7 @@ import Quick from './pages/Quick';
 import Settings from './pages/Settings';
 import Analyst, { AnalystTask } from './pages/Analyst';
 import { SaveProvider, SaveIndicator } from './saved';
+import ErrorBoundary from './components/ErrorBoundary';
 
 const NAV = [
   { to: '/', label: 'Home', icon: 'home', end: true },
@@ -59,6 +60,7 @@ export default function App() {
       </aside>
       <main className="main">
         <div className="savebar"><SaveIndicator /></div>
+        <ErrorBoundary key={loc.pathname}>
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/today" element={<Today />} />
@@ -84,6 +86,7 @@ export default function App() {
           <Route path="/settings" element={<Settings />} />
           <Route path="*" element={<Home />} />
         </Routes>
+        </ErrorBoundary>
       </main>
     </div>
     </SaveProvider>

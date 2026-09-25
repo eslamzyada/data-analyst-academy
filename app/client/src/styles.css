@@ -403,3 +403,18 @@ ul.tight { margin: 6px 0 0; padding-left: 18px; }
 .reasoning-check .check-row { padding: 4px 0; }
 .helpbar.guided { align-items: center; justify-content: space-between; }
 @media (max-width: 900px) { .criteria-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* ---- SQL Lab: which database, its status, its tables; errors that say what to do */
+.db-header { padding: 16px 18px; }
+.db-status { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; }
+.db-status .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--good); }
+.db-status.down .dot { background: var(--bad); }
+.db-status.down { color: var(--bad); }
+.chip { display: inline-flex; align-items: center; padding: 2px 9px; border: 1px solid var(--line); border-radius: 999px; background: #fff; font-size: 12.5px; color: var(--primary-ink); cursor: pointer; }
+.chip:hover { border-color: var(--primary-ink); }
+span.chip { cursor: default; color: inherit; }
+.starter-note { display: flex; gap: 8px; align-items: flex-start; padding: 8px 12px; border-radius: 8px; background: #f3f7ff; color: var(--ink); }
+.sql-error-card { border: 1px solid #f1c2c2; background: #fff7f7; border-radius: 10px; padding: 14px 16px; }
+.sql-error-card pre { background: #fff; border: 1px solid var(--line-2); border-radius: 6px; padding: 8px 10px; }
+.sql-task-context { padding: 10px 12px; border: 1px solid var(--line-2); border-radius: 10px; background: #fafbfc; }
+.page-error { max-width: 720px; }

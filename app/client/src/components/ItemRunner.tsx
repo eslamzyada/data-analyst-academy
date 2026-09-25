@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api, fileUrl, upload, SKILL_NAMES } from '../api';
 import { Markdown, Stars, SkillTag, fmtNum } from './ui';
-import { FormulaGrid, SqlEditor, ResultTable, SchemaDrawer } from './Sheets';
+import { FormulaGrid, SqlEditor, ResultTable, SchemaDrawer, SqlError, SqlTaskContext } from './Sheets';
 import { useSavedWork } from '../saved';
 import Icon from './Icon';
 import { OUTCOME, STATE, taskState, outcomeOf } from '../../../shared/lifecycle.js';
@@ -287,16 +287,13 @@ export default function ItemRunner({
       )}
       {item.type === 'sql' && (
         <div className="stack" style={{ margin: '14px 0' }}>
-          <div className="row between">
-            <span className="muted small">Database: <b>{item.db}</b> · Ctrl+Enter runs the query</span>
-            <button className="btn ghost sm" onClick={() => setDrawer(true)}><Icon name="table" size={15} />Tables &amp; columns</button>
-          </div>
+          <SqlTaskContext db={item.db} onSchema={() => setDrawer(true)} onInsert={(t) => update(`${answer}${answer.endsWith(' ') || !answer ? '' : ' '}${t}`)} />
           <SqlEditor value={answer ?? ''} onChange={update} onRun={runSql} db={item.db} />
           <div className="row">
             <button className="btn" onClick={runSql}><Icon name="play" size={14} />Run</button>
             {preview && !preview.ok && <span className="muted small">Fix the error, then run again.</span>}
           </div>
-          {preview && (preview.ok ? <ResultTable res={preview} /> : <div className="sql-error">{preview.error}</div>)}
+          {preview && (preview.ok ? <ResultTable res={preview} /> : <SqlError res={preview} onInsert={(t) => update(`${answer}${answer.endsWith(' ') || !answer ? '' : ' '}${t}`)} />)}
           {drawer && <SchemaDrawer db={item.db} onClose={() => setDrawer(false)} onInsert={(t) => update(`${answer}${answer.endsWith(' ') || !answer ? '' : ' '}${t}`)} />}
         </div>
       )}

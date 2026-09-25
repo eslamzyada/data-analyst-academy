@@ -77,7 +77,8 @@ parentPort.on('message', ({ id, db, sql, maxRows = 1000 }) => {
     let total = 0;
     while (stmt.step()) {
       total++;
-      if (rows.length < maxRows) rows.push(stmt.get());
+      // a BLOB comes back as a Uint8Array, which JSON turns into an object no page can show
+      if (rows.length < maxRows) rows.push(stmt.get().map((v) => (v instanceof Uint8Array ? { binary: true, bytes: v.length } : v)));
     }
     stmt.free();
     const changed = d.getRowsModified();
