@@ -385,6 +385,20 @@ section('cold start: a brand-new learner');
   ok(qi && qi.topicId === engine.focus().topicId && (qi.difficulty || 2) <= 2, 'quick practice for a new learner: the current topic, an easier question', JSON.stringify(qi && [qi.id, qi.topicId, qi.difficulty]));
 }
 {
+  // the thread: a new learner stays with the topic in hand instead of being rotated to another tool
+  reset();
+  store.run('DELETE FROM daily_plan');
+  const x = content.topicMap['xl-basics'];
+  put(x.tryIt.id, 'tryit', 1);
+  put(x.quiz[0].id, 'quiz', 1);
+  put(x.quiz[1].id, 'quiz', 1);
+  const f = engine.focus();
+  ok(f.topicId === 'xl-basics' && f.mode === 'continue', 'while getting to know the learner, the focus stays on the topic in hand (no rotation to SQL after three right answers)', JSON.stringify(f));
+  x.quiz.slice(2, 25).forEach((it) => put(it.id, 'quiz', 1));
+  const g = engine.focus();
+  ok(engine.learnerPhase().phase === 'personalized' && g.topicId !== 'xl-basics', 'once the app knows the learner, the usual rotation between tools applies again', JSON.stringify(g));
+}
+{
   // Real Analyst: suggested when the learner is ready, never locked
   reset();
   let r = analyst.readiness();
