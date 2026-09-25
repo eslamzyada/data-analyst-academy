@@ -673,7 +673,11 @@ try {
     const nothere = await fetch(`${BASE}/api/no-such-thing`);
     const nothereText = await nothere.text();
     check('ERRORS: an unknown API path answers 404 in JSON, not the app page', nothere.status === 404 && !!JSON.parse(nothereText).error, nothereText.slice(0, 200));
-    check('ERRORS: the Academy itself still loads for the browser', (await fetch(`${BASE}/`)).status === 200);
+    // the app route still answers "/", not the API error handling: the page itself when the client is built,
+    // or the plain "not built yet" note when it isn't (CI's test job never builds the client)
+    const page = await fetch(`${BASE}/`);
+    const pageText = await page.text();
+    check('ERRORS: the Academy page is still answered by the app, not by the API error handling', (page.status === 200 && pageText.includes('<div id="root">')) || (page.status === 503 && /has not been built yet/.test(pageText)), `${page.status} ${pageText.slice(0, 120)}`);
     // if a check above failed, the refused folder may exist after all: remove exactly that test folder
     if (fs.existsSync(outside) && path.basename(outside) === 'no-such-test-folder') fs.rmSync(outside, { recursive: true, force: true });
   }
