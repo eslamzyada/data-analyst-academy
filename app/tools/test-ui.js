@@ -411,6 +411,9 @@ const scenarios = {
     await b.goto(`${BASE}/#/sql?db=no-such-db`);
     await b.waitFor(`!!document.querySelector('.db-header')`, { label: 'fallback database', timeout: 8000 }).catch(() => {});
     check('sqllab: a link to an unknown database falls back to a real one, with a note', /There is no practice database called "no-such-db"/.test(await b.text()) && /Cedarline/.test(await header()), (await b.text()).slice(0, 300));
+    await setEditor('SELECT COUNT(*) AS n FROM customers');
+    await runQuery();
+    check('sqllab: ...and queries really run against that database', (await b.evaluate(`document.querySelectorAll('.main table.data tbody tr').length`)) === 1 && !(await b.evaluate(`!!document.querySelector('.sql-error-card')`)), await b.text());
 
     // the practice database becomes unavailable: the problem stays in the result area
     await api('POST', '/api/test/sql-faults', { sql: 'missing' });
