@@ -19,7 +19,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let server = null;
 let serverOut = '';
 function startServer() {
-  server = spawn(process.execPath, ['server/index.js'], { cwd: APP, env: { ...process.env, PORT: String(PORT), ACADEMY_DATA: tmp, ACADEMY_REQUIRE_TEST_DATA: '1' }, stdio: ['ignore', 'pipe', 'pipe'] });
+  server = spawn(process.execPath, ['server/index.js'], { cwd: APP, env: { ...process.env, PORT: String(PORT), ACADEMY_DATA: tmp, ACADEMY_REQUIRE_TEST_DATA: '1', ACADEMY_TEST_FAULTS: '1' }, stdio: ['ignore', 'pipe', 'pipe'] });
   server.stdout.on('data', (d) => { serverOut += d; });
   server.stderr.on('data', (d) => { serverOut += d; });
 }
@@ -72,7 +72,9 @@ const scenarios = {
     const url = `${BASE}/#/task/bp-xl-basics-p3`;
     await b.goto(url);
     await b.waitFor(`!!document.querySelector('.formula-bar input')`, { label: 'formula bar' });
-    await b.type('.formula-bar input', 'C2/');
+    check('task: the formula box starts empty, so typing "=" as in Excel gives one "=", not two', (await inputValue(b, '.formula-bar input')) === '', await inputValue(b, '.formula-bar input'));
+    await b.type('.formula-bar input', '=C2/');
+    check('task: typed formula starts with exactly one "="', (await inputValue(b, '.formula-bar input')) === '=C2/', await inputValue(b, '.formula-bar input'));
     await waitSaved(b);
     check('task: typing shows the Saved indicator', true);
     await b.reload();
@@ -119,6 +121,67 @@ const scenarios = {
   },
 
   // ------------------------------------------------------------ an incorrect answer is not a dead end
+  // ------------------------------------------------------------ formula grading: learner mistakes vs app problems
+  async formula(b) {
+    const answered = async () => (await api('GET', '/api/progress')).stats.answered;
+    const box = '.formula-bar input';
+    const feedback = () => b.evaluate(`(() => { const f = document.querySelector('.feedback'); return f ? { outcome: f.dataset.outcome, head: f.querySelector('h4')?.innerText || '', text: f.innerText, techOpen: !!f.querySelector('details.tech-details[open]'), hasTech: !!f.querySelector('details.tech-details') } : null; })()`);
+    const waitFeedback = (label) => b.waitFor(`!!document.querySelector('.feedback')`, { label, timeout: 8000 });
+    const checkNow = async () => { await b.click(/^(Check|Check again|Try checking again)$/); };
+    await b.goto(`${BASE}/#/task/xl-basics-p2`);
+    await b.waitFor(`!!document.querySelector('${box}')`, { label: 'formula task' });
+    const n0 = await answered();
+
+    // 1-4: a valid formula, typed the Excel way
+    await b.type(box, '=B2/$B$7');
+    check('formula: the box holds what was typed, with one "="', (await inputValue(b, box)) === '=B2/$B$7', await inputValue(b, box));
+    await checkNow(); await waitFeedback('first check');
+    let fb = await feedback();
+    check('formula: a valid formula is marked correct', fb && fb.outcome === 'CORRECT' && /Correct/.test(fb.head), JSON.stringify(fb));
+
+    // 5-6: an equivalent formula (only the row of B7 locked) is accepted too
+    await b.click('Try again');
+    await b.type(box, '=B2/B$7', { replace: true });
+    await checkNow(); await waitFeedback('equivalent');
+    fb = await feedback();
+    check('formula: an equivalent valid formula is accepted', fb && fb.outcome === 'CORRECT', JSON.stringify(fb));
+
+    // 7-8: a malformed formula is the learner's mistake, and is not dressed up as an app failure
+    await b.click('Try again');
+    await b.type(box, '=B2/*$B$7', { replace: true });
+    await checkNow(); await waitFeedback('malformed');
+    fb = await feedback();
+    check('formula: a malformed formula says Excel can\'t read it, and why', fb && fb.outcome === 'INCORRECT' && /Excel can't read this formula/.test(fb.head) && /two operators/.test(fb.text), JSON.stringify(fb));
+    check('formula: ...and never says the app could not check it', fb && !/couldn't check|problem on our side/i.test(fb.text), fb && fb.text);
+    const n1 = await answered();
+
+    // 9-11: the parser fails on a valid formula: "couldn't check", not counted
+    // (the equivalent formula, not the model answer: that one is still recognised by its text when the calculator fails)
+    await api('POST', '/api/test/faults', { formula: 'parse' });
+    await b.type(box, '=B2/B$7', { replace: true });
+    await checkNow(); await b.waitFor(`document.querySelector('.feedback')?.dataset.outcome === 'NOT_EVALUABLE'`, { label: 'parser fault', timeout: 8000 }).catch(() => {});
+    fb = await feedback();
+    check('formula: the parser failing on a valid formula shows "We couldn\'t check this formula automatically"', fb && fb.outcome === 'NOT_EVALUABLE' && /couldn't check this formula automatically/i.test(fb.head), JSON.stringify(fb));
+    check('formula: the engine\'s own words are behind "Technical details", closed', fb && fb.hasTech && !fb.techOpen && !/Parsing error/.test(fb.text.replace(/Technical details[\s\S]*$/, '')), JSON.stringify(fb));
+    await api('POST', '/api/test/faults', { formula: 'cache' });
+    await checkNow(); await b.waitFor(`document.querySelector('.feedback')?.dataset.outcome === 'EVALUATION_ERROR'`, { label: 'cache fault', timeout: 8000 }).catch(() => {});
+    fb = await feedback();
+    check('formula: an AST-cache failure shows "We couldn\'t check this right now", nothing marked wrong', fb && fb.outcome === 'EVALUATION_ERROR' && /couldn't check this right now/i.test(fb.head) && /nothing has been marked wrong/i.test(fb.text) && !/AST|cache/.test(fb.head + fb.text.replace(/Technical details[\s\S]*$/, '')), JSON.stringify(fb));
+    check('formula: answers the app could not check are not counted as attempts', (await answered()) === n1, `${n1} -> ${await answered()}`);
+
+    // 12: once the app works again, the same answer is checked normally and progress is consistent
+    await api('POST', '/api/test/faults', { formula: 'ok' });
+    await checkNow(); await b.waitFor(`document.querySelector('.feedback')?.dataset.outcome === 'CORRECT'`, { label: 'recovered', timeout: 8000 }).catch(() => {});
+    fb = await feedback();
+    check('formula: after the fault clears, checking again gives the real verdict', fb && fb.outcome === 'CORRECT', JSON.stringify(fb));
+    check('formula: progress counted exactly the four real checks (3 right, 1 malformed)', (await answered()) === n0 + 4, `${n0} -> ${await answered()}`);
+    await waitSaved(b).catch(() => {});
+    await sleep(600);
+    await b.reload();
+    await b.waitFor(`!!document.querySelector('.donebar') || !!document.querySelector('.feedback')`, { label: 'after refresh', timeout: 6000 }).catch(() => {});
+    check('formula: after a refresh the task shows as completed', /Completed/.test(await b.text()), (await b.text()).slice(0, 300));
+  },
+
   async wrong(b) {
     await b.goto(`${BASE}/#/task/bp-xl-basics-p4`);
     await b.waitFor(`!!document.querySelector('.formula-bar input')`, { label: 'formula bar' });

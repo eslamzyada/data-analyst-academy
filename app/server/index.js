@@ -14,7 +14,7 @@ import { loadContent, content, clientItem, getItem, toStoredAnswer, toShownAnswe
 import * as engine from './engine.js';
 import { initSqlRunner, runSql } from './sqlrunner.js';
 import { gradeSql, expectedResult } from './grading/sql.js';
-import { gradeFormula, evaluate, setEvaluatorForTests, clearFormulaCache } from './grading/formula.js';
+import { gradeFormula, evaluate, setEvaluatorForTests, clearFormulaCache, parseAddr, idxToCol } from './grading/formula.js';
 import { readAnswerCells, gradeParts } from './grading/excel.js';
 import { autoCheck } from './grading/text.js';
 import { answerMatches, textMatches, numbersMatch } from './grading/values.js';
@@ -494,6 +494,7 @@ const storedResult = (r) => ({
   cells: r.cells || null, spill: r.spill || null, error: r.error || null, engineError: r.engineError || r.evaluationError || null,
   method: r.method || null, explain: r.explain || null, solution: r.solution || null, model: r.model || null, answer: r.answer || null,
   detected: r.detected || null, formulasUsed: r.formulasUsed ?? null,
+  reason: r.reason || null, notice: r.notice || null, technical: r.technical || null,
 });
 
 function afterGrade(it, r, body) {
@@ -594,13 +595,29 @@ app.post('/api/items/:id/upload', express.raw({ type: '*/*', limit: '25mb' }), w
 }));
 
 // Fault injection for the automated tests only (the server must be started with ACADEMY_TEST_FAULTS=1).
-// It breaks the formula calculator on purpose, to prove a broken grader never marks anyone wrong.
+// It breaks the formula calculator on purpose, to prove a broken grader never marks anyone wrong:
+//   fail / cache  the engine fails with its AST-cache error      -> EVALUATION_ERROR
+//   parse         the engine can't parse any formula at all       -> NOT_EVALUABLE (valid formula)
+//   throw         the grader itself crashes                       -> EVALUATION_ERROR
 if (process.env.ACADEMY_TEST_FAULTS === '1') {
+  const PARSE_FAIL = { error: '#ERROR', message: 'Parsing error. (a fault injected by the tests)' };
+  const FAULTS = {
+    fail: () => ({ engineError: 'There is no AST with such key in the cache.' }),
+    cache: () => ({ engineError: 'There is no AST with such key in the cache.' }),
+    parse: (grid, formula, target, fillTo) => {
+      const t = parseAddr(target);
+      const end = fillTo ? parseAddr(fillTo) : t;
+      const cells = [];
+      for (let r = t.row; r <= end.row; r++) for (let c = t.col; c <= end.col; c++) cells.push({ addr: `${idxToCol(c)}${r + 1}`, value: PARSE_FAIL });
+      return { cells, spill: null };
+    },
+    throw: () => { throw new Error('grader crashed (a fault injected by the tests)'); },
+  };
   app.post('/api/test/faults', wrap((req, res) => {
     const mode = String(req.body.formula || 'ok');
-    setEvaluatorForTests(mode === 'fail' ? () => ({ engineError: 'There is no AST with such key in the cache.' }) : null);
+    setEvaluatorForTests(FAULTS[mode] || null);
     clearFormulaCache();
-    res.json({ formula: mode });
+    res.json({ formula: FAULTS[mode] ? mode : 'ok' });
   }));
 }
 

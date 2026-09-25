@@ -18,7 +18,20 @@
 //   * Ranges are written top-left first before the engine sees them, as Excel does.
 //   * Engine failure: retry once on a fresh engine, then compare the text with the model and
 //     accepted answers, and otherwise return "not checked" - never "incorrect".
+//
+// What a check can conclude (every result carries `outcome` and a `reason`):
+//   CORRECT          the result matches the model answer's result (any valid method)
+//   INCORRECT        wrong-result, error-value, fill-down, typed-constant, and the learner's own
+//                    mistakes Excel would also reject: syntax (a missing quote, two operators in
+//                    a row...), unknown-function (a name Excel doesn't have), not-excel
+//   NOT_EVALUABLE    empty, unsupported-function / unsupported-syntax (real Excel the practice
+//                    calculator can't run), parser (the calculator can't read a formula that
+//                    shows no mistake Excel would reject): nothing is recorded, nothing is "wrong"
+//   EVALUATION_ERROR engine / model: the app failed; never the learner's fault
+// Grading is designed around what Excel accepts, not around what is convenient for the engine.
 import { HyperFormula } from 'hyperformula';
+import { OUTCOME } from '../../shared/lifecycle.js';
+import { EXCEL_FUNCTIONS, SHEETS_ONLY } from './excel-functions.js';
 
 const CONFIG = {
   licenseKey: 'gpl-v3',
@@ -152,9 +165,27 @@ export function orderRanges(formula) {
     .replace(ROW_RANGE, (m, a1, r1, a2, r2) => (Number(r1) <= Number(r2) ? m : `${a2}${r2}:${a1}${r1}`)));
 }
 
+/**
+ * Harmless differences in how a formula was typed, removed before anything else looks at it:
+ * invisible characters, a full-width =, and a doubled leading = ("==SUM(...)": the formula box
+ * used to start with = already, and Excel habit adds another). Returns the text and what changed.
+ */
+export function cleanFormulaInput(input) {
+  const notes = [];
+  let f = String(input ?? '').replace(/[​-‍﻿]/g, '').replace(/ /g, ' ').replace(/＝/g, '=').trim();
+  if (/^=\s*=/.test(f)) { f = f.replace(/^=(\s*=)+/, '='); notes.push('extra-equals'); }
+  // Excel closes brackets left open at the end (it offers the correction); so do we
+  let open = 0;
+  for (const part of f.split(/("(?:[^"]|"")*"?)/).filter((p, i) => i % 2 === 0)) {
+    for (const c of part) { if (c === '(') open++; else if (c === ')') open = Math.max(0, open - 1); }
+  }
+  if (open > 0 && open <= 5 && !/"(?:[^"]|"")*$/.test(f.replace(/"(?:[^"]|"")*"/g, ''))) { f += ')'.repeat(open); notes.push('closed-brackets'); }
+  return { text: f, notes };
+}
+
 /** Normalise what a learner typed into something the engine accepts. */
 export function normaliseFormula(input) {
-  let f = String(input || '').trim();
+  let f = cleanFormulaInput(input).text;
   if (!f) return '';
   if (f.startsWith('+')) f = '=' + f.slice(1);
   if (!f.startsWith('=')) f = '=' + f;
@@ -167,11 +198,133 @@ export function normaliseFormula(input) {
   return '=' + orderRanges(body);
 }
 
-export function usedUnsupported(input) {
-  const names = [...String(input).toUpperCase().matchAll(/([A-Z][A-Z0-9.]*)\s*\(/g)].map((m) => m[1]);
-  const out = names.filter((n) => UNSUPPORTED.includes(n));
-  if (TEXT_FORMAT_UNSUPPORTED.test(String(input))) out.push('TEXT with month names, day names or %');
+// ---------------------------------------------------------------- what a formula uses
+const ENGINE_FUNCTIONS = new Set(HyperFormula.getRegisteredFunctionNames('enGB'));
+const stripStrings = (s) => String(s).replace(/"(?:[^"]|"")*"?/g, '""');
+
+/** The function names a formula calls (outside quoted text), upper-cased, in order, once each. */
+export function functionNames(input) {
+  const out = [];
+  for (const m of stripStrings(input).matchAll(/(?<![A-Za-z0-9_.$!])([A-Za-z_][A-Za-z0-9_.]*)\s*\(/g)) {
+    const n = m[1].toUpperCase();
+    if (!out.includes(n)) out.push(n);
+  }
   return out;
+}
+
+function editDistance(a, b) {
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
+  for (let j = 1; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+  }
+  return d[a.length][b.length];
+}
+
+/** The closest real Excel function name, when one is close enough to be what was meant. */
+export function suggestFunction(name) {
+  let best = null;
+  let bestD = 3;
+  for (const f of EXCEL_FUNCTIONS) {
+    if (Math.abs(f.length - name.length) > 2) continue;
+    const dist = editDistance(name, f);
+    if (dist < bestD || (dist === bestD && best && f.length === name.length && best.length !== name.length)) { best = f; bestD = dist; }
+  }
+  // short names need a closer match (SUMM -> SUM, but FOO is not COS)
+  return best && bestD <= (name.length <= 4 ? 1 : 2) ? best : null;
+}
+
+/**
+ * Sorts the functions a formula calls into:
+ *   unsupported  real Excel, but the practice calculator can't run it (or runs it differently)
+ *   unknown      not an Excel function at all (usually a typo), with a suggestion when there is one
+ *   sheetsOnly   Google Sheets functions Excel doesn't have
+ */
+export function checkFunctions(input) {
+  const out = { unsupported: [], unknown: [], sheetsOnly: [] };
+  for (const n of functionNames(input)) {
+    if (SHEETS_ONLY.has(n)) out.sheetsOnly.push({ name: n, instead: SHEETS_ONLY.get(n) });
+    else if (UNSUPPORTED.includes(n)) out.unsupported.push(n);
+    else if (EXCEL_FUNCTIONS.has(n)) { if (!ENGINE_FUNCTIONS.has(n) && !REWRITES[n]) out.unsupported.push(n); }
+    else if (!ENGINE_FUNCTIONS.has(n)) out.unknown.push({ name: n, suggestion: suggestFunction(n) });
+  }
+  if (TEXT_FORMAT_UNSUPPORTED.test(String(input))) out.unsupported.push('TEXT with month names, day names or %');
+  return out;
+}
+
+/** Real Excel functions (and TEXT formats) the practice calculator can't check. */
+export function usedUnsupported(input) {
+  return checkFunctions(input).unsupported;
+}
+
+/** Excel syntax the practice grid can't calculate (it has no tables and no spilled ranges to point at). */
+export function excelOnlySyntax(input) {
+  const s = stripStrings(input);
+  if (/[A-Za-z0-9_]\s*\[|\[@|\[#/.test(s)) return 'a table reference like Table1[Amount]';
+  if (/\$?[A-Za-z]{1,3}\$?\d+#/.test(s)) return 'a spill reference like A2#';
+  if (/\[[^\]]*\.(xlsx|xlsm|xls)\]/i.test(s)) return 'a link to another workbook';
+  return null;
+}
+
+/**
+ * A plain-language description of a mistake Excel itself would reject, or null when the formula
+ * shows none. Only asked after the calculator failed to read a formula, and deliberately
+ * conservative: when in doubt it says nothing, and the answer is "not checked" instead of "wrong".
+ */
+export function syntaxProblem(input) {
+  const f = cleanFormulaInput(input).text.replace(/^[=+]/, '');
+  const BINARY = new Set(['*', '/', '^', '&', '=', '<', '>', '<=', '>=', '<>']);
+  const OPS = new Set([...BINARY, '+', '-']);
+  let depth = 0;
+  let prev = 'start';       // start | operand | op | open | comma
+  let prevText = '';
+  for (let i = 0; i < f.length;) {
+    const c = f[i];
+    if (/\s/.test(c)) { i++; continue; }
+    if (c === '"') {
+      let j = i + 1;
+      for (;;) {
+        if (j >= f.length) return 'a quote mark (") is missing: text in a formula goes between two quote marks, like "kg".';
+        if (f[j] === '"' && f[j + 1] === '"') { j += 2; continue; }
+        if (f[j] === '"') break;
+        j++;
+      }
+      prev = 'operand'; prevText = f.slice(i, j + 1); i = j + 1; continue;
+    }
+    const two = f.slice(i, i + 2);
+    const op = ['<=', '>=', '<>'].includes(two) ? two : OPS.has(c) ? c : null;
+    if (op) {
+      if (op === '=' && prevText === '=' && prev === 'op') return '"==" is not an Excel operator. To compare two values use a single = (for example =A2=B2).';
+      if (BINARY.has(op) && (prev === 'op' || prev === 'start' || prev === 'open' || prev === 'comma')) {
+        return prev === 'op' ? `two operators in a row ("${prevText}${op}"): something is missing between them.` : `something is missing before "${op}".`;
+      }
+      prev = 'op'; prevText = op; i += op.length; continue;
+    }
+    if (c === '(') { depth++; prev = 'open'; prevText = c; i++; continue; }
+    if (c === ')') {
+      if (depth === 0) return 'there is a closing bracket ")" without an opening one.';
+      if (prev === 'op') return `something is missing after "${prevText}", before the closing bracket.`;
+      depth--; prev = 'operand'; prevText = c; i++; continue;
+    }
+    if (c === ',' || c === ';') {
+      if (prev === 'op') return `something is missing after "${prevText}".`;
+      prev = 'comma'; prevText = c; i++; continue;
+    }
+    // an operand: an error value, a quoted sheet name with its reference, or a run of name,
+    // number, reference or array-constant characters up to the next operator, bracket or separator
+    const err = /^#(NULL!|DIV\/0!|VALUE!|REF!|NAME\?|NUM!|N\/A|SPILL!|CALC!)/i.exec(f.slice(i));
+    let j = i;
+    if (err) j = i + err[0].length;
+    else {
+      if (c === "'") { const k = f.indexOf("'", i + 1); j = k === -1 ? f.length : k + 1; }
+      const rest = /^[^\s+\-*/^&=<>(),;"]*/.exec(f.slice(j));
+      j += rest[0].length;
+    }
+    if (j === i) return `the character "${c}" can't be used there.`;
+    prev = 'operand'; prevText = f.slice(i, j); i = j;
+  }
+  if (prev === 'op') return `the formula ends with "${prevText}": something is missing after it.`;
+  return null;
 }
 
 // ---------------------------------------------------------------- reference translation (fill-down)
@@ -205,8 +358,15 @@ export function translateFormula(formula, dRow, dCol) {
 }
 
 // ---------------------------------------------------------------- evaluation
+// The engine's error types, written the way Excel shows them. (A text replace once turned
+// NAME into "#N/AME", so a misspelt function never got its own explanation.)
+const EXCEL_ERROR = { DIV_BY_ZERO: '#DIV/0!', NA: '#N/A', NAME: '#NAME?', VALUE: '#VALUE!', REF: '#REF!', NUM: '#NUM!', NULL: '#NULL!', CYCLE: '#CYCLE!', SPILL: '#SPILL!', ERROR: '#ERROR', LIC: '#LIC!' };
+export function excelErrorText(type) {
+  return EXCEL_ERROR[String(type)] || `#${String(type)}`;
+}
+
 function valueOut(v) {
-  if (v && typeof v === 'object' && 'type' in v) return { error: `#${String(v.type).replace('DIV_BY_ZERO', 'DIV/0!').replace('NA', 'N/A')}`, message: v.message };
+  if (v && typeof v === 'object' && 'type' in v) return { error: excelErrorText(v.type), message: v.message };
   return v;
 }
 
@@ -316,23 +476,57 @@ function referenceResult(item) {
   return res;
 }
 
+const firstLine = (s) => String(s || '').split('\n')[0].slice(0, 300);
+const NOTHING_WRONG = 'Nothing has been marked wrong, and your answer is saved.';
+const COMPARE = 'You can compare it with the model answer (Show answer), or try it in Excel, and then mark it yourself.';
+
+/** A result the learner can't be blamed for: nothing is recorded (see isRecordable). */
+function notChecked(reason, feedback, extra = {}) {
+  return { correct: false, score: 0, noMistake: true, method: 'none', outcome: OUTCOME.NOT_EVALUABLE, reason, feedback, ...extra };
+}
+
 /**
- * Grade a formula. The result always says how the verdict was reached (`method`):
+ * Grade a formula. The result always says how the verdict was reached (`method`) and why
+ * (`reason`, see the top of this file):
  *   engine        calculated and compared with the model answer's result
  *   text-match    the calculator failed twice, but the formula is the model answer (or an
  *                 accepted variant) written differently
- *   none          no verdict: `engineError` says why; the answer is NOT marked wrong
+ *   check         settled before calculating (a function Excel doesn't have)
+ *   none          no verdict; the answer is NOT marked wrong
+ * `notice` is a small tip about how the formula was read (a doubled "=" was taken as one).
+ * `technical` holds the engine's own words, for a "technical details" view only.
  */
 export function gradeFormula(item, formula) {
-  const input = String(formula || '').trim();
-  if (!input || input === '=') return { correct: false, score: 0, feedback: 'Type a formula first (it starts with =).', noMistake: true, method: 'none' };
+  const { text: input, notes } = cleanFormulaInput(formula);
+  const tips = [];
+  if (notes.includes('extra-equals')) tips.push('Your formula started with "==". In Excel a formula starts with a single "=", so it was read as starting with one.');
+  if (notes.includes('closed-brackets')) tips.push('A closing bracket ")" was missing at the end. Excel offers to add it for you, so it was checked with the bracket added.');
+  const notice = tips.length ? tips.join(' ') : null;
+  const r = gradeClean(item, input);
+  return notice && r.reason !== 'empty' ? { ...r, notice } : r;
+}
 
-  const unsupported = usedUnsupported(input);
-  if (unsupported.length) {
+function gradeClean(item, input) {
+  if (!input || input === '=') return notChecked('empty', 'Type a formula first. In Excel a formula starts with =, for example =B2*C2.');
+
+  const special = excelOnlySyntax(input);
+  if (special) {
+    return notChecked('unsupported-syntax', `We couldn't check this formula automatically: it uses ${special}, which Excel understands but this practice grid can't calculate. ${NOTHING_WRONG} ${COMPARE}`, { unsupported: true });
+  }
+  const fn = checkFunctions(input);
+  if (fn.unknown.length) {
+    const u = fn.unknown[0];
     return {
-      correct: false, score: 0, unsupported: true, noMistake: true, method: 'none',
-      feedback: `This practice grid can't calculate ${unsupported.join(', ')} yet, so it can't check your answer automatically. Your formula may well be right: try it in real Excel. Here, an approach with FILTER, SORT, INDEX/MATCH or XLOOKUP can be checked.`,
+      correct: false, score: 0, noMistake: true, method: 'check', outcome: OUTCOME.INCORRECT, reason: 'unknown-function',
+      feedback: `Excel doesn't have a function called ${u.name}.${u.suggestion ? ` Did you mean ${u.suggestion}?` : ' Check the spelling of the function name.'}`,
     };
+  }
+  if (fn.sheetsOnly.length) {
+    const s = fn.sheetsOnly[0];
+    return { correct: false, score: 0, noMistake: true, method: 'check', outcome: OUTCOME.INCORRECT, reason: 'not-excel', feedback: `${s.name} is a Google Sheets function; Excel doesn't have it. ${s.instead}` };
+  }
+  if (fn.unsupported.length) {
+    return notChecked('unsupported-function', `We couldn't check this formula automatically: this practice grid can't calculate ${fn.unsupported.join(', ')}. Your formula may well be right. ${NOTHING_WRONG} ${COMPARE} Here, an approach with FILTER, SORT, INDEX/MATCH or XLOOKUP can be checked.`, { unsupported: true });
   }
 
   const exp = referenceResult(item);
@@ -343,32 +537,51 @@ export function gradeFormula(item, formula) {
     const why = exp.engineError || got.engineError || `model answer could not be calculated: ${exp.parseError}`;
     const accepted = [item.answer, ...(item.accept || [])];
     if (accepted.some((a) => sameFormulaText(input, a))) {
-      return { correct: true, score: 1, method: 'text-match', checkedWithoutEngine: true, engineError: why, feedback: 'Correct. (The calculator was unavailable, so your formula was matched against the model answer instead.)' };
+      return { correct: true, score: 1, method: 'text-match', checkedWithoutEngine: true, engineError: why, technical: why, outcome: OUTCOME.CORRECT, reason: 'text-match', feedback: 'Correct. (The calculator was unavailable, so your formula was matched against the model answer instead.)' };
     }
     return {
-      correct: false, score: 0, noMistake: true, needsReview: true, method: 'none', engineError: why,
-      feedback: 'The formula calculator could not check this answer, so nothing has been marked wrong. Your work is saved. Try checking again in a moment, or compare with the model solution and mark it yourself.',
+      correct: false, score: 0, noMistake: true, needsReview: true, method: 'none', engineError: why, technical: why,
+      outcome: OUTCOME.EVALUATION_ERROR, reason: exp.parseError ? 'model' : 'engine',
+      feedback: `We couldn't check this formula right now: the formula calculator had a problem on our side. ${NOTHING_WRONG} Try checking again in a moment.`,
     };
   }
-  if (got.parseError) return { correct: false, score: 0, feedback: `Excel couldn't read that formula: ${got.parseError}`, noMistake: true, method: 'engine' };
+  if (got.parseError) return { correct: false, score: 0, noMistake: true, method: 'engine', outcome: OUTCOME.INCORRECT, reason: 'syntax', feedback: `Excel can't read this formula: ${got.parseError}` };
 
   const cells = got.cells;
   const firstErr = cells.find((c) => c.value && c.value.error);
+  const parseFailed = firstErr && firstErr.value.error === '#ERROR' && /Parsing error/i.test(firstErr.value.message || '');
+  if (parseFailed) {
+    // the calculator could not read it: a mistake Excel would also reject, or its own limit
+    const problem = syntaxProblem(input);
+    if (problem) return { correct: false, score: 0, noMistake: true, method: 'engine', outcome: OUTCOME.INCORRECT, reason: 'syntax', feedback: `Excel can't read this formula: ${problem}`, technical: firstLine(firstErr.value.message) };
+    return notChecked('parser', `We couldn't check this formula automatically: the practice calculator couldn't read it, although it may be fine in Excel. ${NOTHING_WRONG} ${COMPARE}`, { technical: firstLine(firstErr.value.message) });
+  }
+
   const refs = /\$?[A-Z]{1,3}\$?\d+/i.test(input.replace(/"[^"]*"/g, ''));
   let ok = cells.length === exp.cells.length && cells.every((c, i) => same(c.value, exp.cells[i].value));
   if (ok && exp.spill) {
     ok = !!got.spill && got.spill.length === exp.spill.length && got.spill.every((row, i) => row.length === exp.spill[i].length && row.every((v, j) => same(v, exp.spill[i][j])));
   }
   if (ok && !refs) {
-    return { correct: false, score: 0.3, cells, method: 'engine', feedback: 'The number is right, but you typed it in. Use cell references, so the answer updates when the data changes.' };
+    return { correct: false, score: 0.3, cells, method: 'engine', outcome: OUTCOME.INCORRECT, reason: 'typed-constant', feedback: 'The number is right, but you typed it in. Use cell references, so the answer updates when the data changes.' };
   }
-  if (ok) return { correct: true, score: 1, cells, spill: got.spill, method: 'engine', feedback: item.fillTo ? 'It still works when copied down to every row.' : null };
+  if (ok) return { correct: true, score: 1, cells, spill: got.spill, method: 'engine', outcome: OUTCOME.CORRECT, reason: 'correct', feedback: item.fillTo ? 'It still works when copied down to every row.' : null };
 
   let feedback;
-  const syntax = firstErr && firstErr.value.error === '#ERROR' && /Parsing error/i.test(firstErr.value.message || '');
-  if (syntax) {
-    feedback = 'Excel could not read that formula: check for a missing bracket, comma or quote mark.';
-  } else if (firstErr) {
+  let reason = 'wrong-result';
+  const expNumbers = exp.cells.every((c) => typeof c.value === 'number');
+  const digitsAsText = expNumbers && cells.length === exp.cells.length
+    && cells.every((c, i) => typeof c.value === 'string' && c.value.trim() !== '' && Number.isFinite(Number(c.value)) && same(Number(c.value), exp.cells[i].value));
+  if (!firstErr && digitsAsText) {
+    return { correct: false, score: 0, cells, spill: got.spill, method: 'engine', outcome: OUTCOME.INCORRECT, reason: 'text-not-number',
+      feedback: 'The digits are right, but your formula returns them as text, not as numbers (Excel lines text up on the left, and SUM would skip it). Turn the text into a number, for example with VALUE(...) or by multiplying by 1.' };
+  }
+  if (!firstErr && !refs) {
+    return { correct: false, score: 0, cells, spill: got.spill, method: 'engine', outcome: OUTCOME.INCORRECT, reason: 'typed-constant',
+      feedback: 'Your formula has no cell references, so it gives the same fixed value in every row. Point at the cells that hold the data instead (for example A2).' };
+  }
+  if (firstErr) {
+    reason = 'error-value';
     const e = firstErr.value.error;
     feedback = e === '#NAME?' ? 'Excel does not recognise a name in your formula (#NAME?). Check the function spelling and that text is inside "quotes".'
       : e === '#N/A' ? 'Your lookup could not find a match (#N/A). Check the lookup value, the column you search in, and whether it needs an exact match.'
@@ -377,15 +590,17 @@ export function gradeFormula(item, formula) {
             : e === '#DIV/0!' ? 'You are dividing by zero (#DIV/0!). Wrap it with IFERROR, or check the denominator.'
               : `Your formula returns an error (${e}).`;
     if (item.fillTo && !(cells[0].value && cells[0].value.error)) {
+      reason = 'fill-down';
       feedback = `${item.target} works, but after copying down ${firstErr.addr} shows ${e}. Do some references need $ signs to stay fixed?`;
     }
   } else if (item.fillTo && same(cells[0].value, exp.cells[0].value)) {
+    reason = 'fill-down';
     const bad = cells.find((c, i) => !same(c.value, exp.cells[i].value));
     feedback = `${item.target} is right, but after copying down ${bad.addr} is wrong. When a formula is copied, relative references move. Lock the ones that must not move with $ (for example $F$1).`;
   } else {
-    feedback = 'Your formula gives a different result from the expected one. Check which range you sum or look up in, and your conditions.';
+    feedback = 'Your formula gives a different result from the expected one. Compare the results in the grid with what the task asks for: check the cells you point at, and any conditions.';
   }
-  return { correct: false, score: 0, cells, spill: got.spill, method: 'engine', noMistake: syntax || undefined, feedback };
+  return { correct: false, score: 0, cells, spill: got.spill, method: 'engine', outcome: OUTCOME.INCORRECT, reason, feedback };
 }
 
 /** Used by the content validator. */

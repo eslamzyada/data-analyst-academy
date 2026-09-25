@@ -74,7 +74,7 @@ export function recordAnswer(sessionId, itemId, given, result) {
   s.answers[itemId] = given ?? null;
   s.results[itemId] = {
     outcome: result.outcome, correct: !!result.correct, score: result.score ?? (result.correct ? 1 : 0),
-    feedback: result.feedback || null, at: nowIso(),
+    feedback: result.feedback || null, reason: result.reason || null, notice: result.notice || null, at: nowIso(),
   };
   run('UPDATE quiz_sessions SET answers = ?, results = ? WHERE id = ?', [JSON.stringify(s.answers), JSON.stringify(s.results), s.id]);
   return true;

@@ -15,7 +15,7 @@ process.env.ACADEMY_SQL_LIMIT_MS ||= '2500';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const { loadContent, content } = await import('../server/content/index.js');
-const { gradeFormula, translateFormula, sameFormulaText, clearFormulaCache, orderRanges, setEvaluatorForTests, evaluate } = await import('../server/grading/formula.js');
+const { gradeFormula, translateFormula, sameFormulaText, clearFormulaCache, orderRanges, setEvaluatorForTests, evaluate, syntaxProblem, checkFunctions, cleanFormulaInput, excelErrorText, parseAddr, idxToCol } = await import('../server/grading/formula.js');
 const { sameSqlText, gradeSql } = await import('../server/grading/sql.js');
 const { dateMatches } = await import('../server/grading/excel.js');
 const { initSqlRunner, runSql } = await import('../server/sqlrunner.js');
@@ -130,7 +130,7 @@ section('missing AST / cache entry');
   ok(outcomeOf(other) === OUTCOME.EVALUATION_ERROR && other.noMistake && !isRecordable(outcomeOf(other)),
     'missing AST twice + any other answer -> EVALUATION_ERROR, not recorded', JSON.stringify(other));
   ok(outcomeOf(empty) === OUTCOME.EVALUATION_ERROR, 'missing AST twice never becomes INCORRECT, whatever the answer', JSON.stringify(empty));
-  ok(/could not check/i.test(other.feedback || '') && /saved/i.test(other.feedback || '') && !/wrong|incorrect/i.test((other.feedback || '').replace(/nothing has been marked wrong/i, '')),
+  ok(/could(n.t| not) check/i.test(other.feedback || '') && /saved/i.test(other.feedback || '') && !/wrong|incorrect/i.test((other.feedback || '').replace(/nothing has been marked wrong/i, '')),
     'the learner is told the app could not check it, that nothing is marked wrong and the work is saved', other.feedback);
 
   // failing once: a fresh engine is built and the real verdict comes back
@@ -202,6 +202,99 @@ ok(repeatWrong === 0, '300 repeated submissions of the same task all stay correc
 ok(heapAfter - heapBefore < 150e6, 'repeated grading does not leak memory', `${Math.round((heapAfter - heapBefore) / 1e6)}MB growth`);
 
 // ================================================================ SQL GRADING
+// ================================================================ FORMULA MATRIX: learner vs system
+// Every way a formula check can end, on one real task ("12 kg" -> 12, copied down). A problem of
+// the app (engine, parser, cache, crash) must never become a wrong answer; a mistake Excel would
+// reject is the learner's, and says so plainly.
+section('formula matrix: learner mistakes vs app problems');
+{
+  const kg = content.items['xl2-cln-02'];
+  ok(kg && kg.type === 'formula' && kg.fillTo, 'the matrix task exists (weights like "12 kg" into kilograms, copied down)');
+  const g = (f) => gradeFormula(kg, f);
+  const is = (r, outcome, reason) => outcomeOf(r) === outcome && r.outcome === outcome && (!reason || r.reason === reason);
+  const show = (r) => JSON.stringify({ outcome: r.outcome, reason: r.reason, feedback: (r.feedback || '').slice(0, 90) });
+  const cases = [
+    ['1. the exact model answer', kg.answer, OUTCOME.CORRECT, 'correct'],
+    ['2. a valid equivalent formula', '=SUBSTITUTE(A2," kg","")*1', OUTCOME.CORRECT, 'correct'],
+    ['3. harmless spacing inside', '= VALUE( SUBSTITUTE( A2 , " kg" , "" ) )', OUTCOME.CORRECT, 'correct'],
+    ['4. lower-case function names and references', '=value(substitute(a2," kg",""))', OUTCOME.CORRECT, 'correct'],
+    ['5. another valid approach', '=--SUBSTITUTE(A2," kg","")', OUTCOME.CORRECT, 'correct'],
+    ['6. malformed: a quote mark missing', '=VALUE(SUBSTITUTE(A2," kg,""))', OUTCOME.INCORRECT, 'syntax'],
+    ['7. a wrong formula', '=VALUE(SUBSTITUTE(A2," kg",""))*2', OUTCOME.INCORRECT, 'wrong-result'],
+    ['8. an empty answer', '', OUTCOME.NOT_EVALUABLE, 'empty'],
+    ['9. extra whitespace around it', '   =VALUE(SUBSTITUTE(A2," kg",""))   ', OUTCOME.CORRECT, 'correct'],
+    ['10. a duplicated leading "="', '==SUBSTITUTE(A2, " kg", "")*1', OUTCOME.CORRECT, 'correct'],
+    ['14. a real Excel function the calculator lacks', '=NUMBERVALUE(SUBSTITUTE(A2," kg",""))', OUTCOME.NOT_EVALUABLE, 'unsupported-function'],
+    ['15. a wrong result: the digits come back as text', '=SUBSTITUTE(A2," kg","")', OUTCOME.INCORRECT, 'text-not-number'],
+    ['16. the right result by another valid method', '=LEFT(A2,FIND(" ",A2)-1)*1', OUTCOME.CORRECT, 'correct'],
+    ['a misspelt function (Excel would say #NAME?)', '=VALUE(SUBSITUTE(A2," kg",""))', OUTCOME.INCORRECT, 'unknown-function'],
+    ['a Google Sheets function', '=COUNTUNIQUE(A2:A5)', OUTCOME.INCORRECT, 'not-excel'],
+    ['a table reference Excel understands', '=VALUE(SUBSTITUTE(Table1[@Weight]," kg",""))', OUTCOME.NOT_EVALUABLE, 'unsupported-syntax'],
+    ['a fixed value typed in', '=12', OUTCOME.INCORRECT, 'typed-constant'],
+    ['a missing closing bracket at the end (Excel adds it itself)', '=VALUE(SUBSTITUTE(A2," kg","")', OUTCOME.CORRECT, 'correct'],
+  ];
+  for (const [label, f, outcome, reason] of cases) { const r = g(f); ok(is(r, outcome, reason), `matrix ${label} -> ${outcome} (${reason})`, show(r)); }
+
+  const dbl = g('==SUBSTITUTE(A2, " kg", "")*1');
+  ok(dbl.correct && /single "="/.test(dbl.notice || ''), 'a doubled "=" is read as one, and the learner is told so in a small tip', show(dbl));
+  const typo = g('=VALUE(SUBSITUTE(A2," kg",""))');
+  ok(/SUBSITUTE/.test(typo.feedback) && /Did you mean SUBSTITUTE\?/.test(typo.feedback) && typo.noMistake, 'a misspelt function is named, with the likely one ("Did you mean SUBSTITUTE?")', typo.feedback);
+  const quote = g('=VALUE(SUBSTITUTE(A2," kg,""))');
+  ok(/quote/i.test(quote.feedback) && quote.noMistake && !/Parsing error|Token/i.test(quote.feedback), 'a syntax mistake is explained in plain words, without the engine\'s parser text', quote.feedback);
+  ok(!/AST|cache|Token|Parsing/i.test([g('').feedback, g('=NUMBERVALUE(A2)').feedback, g('=VALUE(SUBSTITUTE(Table1[@Weight]," kg",""))').feedback].join(' ')),
+    'messages for answers that could not be checked contain no internal words (AST, cache, parser tokens)');
+  ok(!isRecordable(g('').outcome) && !isRecordable(g('=NUMBERVALUE(A2)').outcome) && isRecordable(g('=VALUE(SUBSTITUTE(A2," kg,""))').outcome),
+    'unchecked answers are never recorded; a syntax mistake Excel would reject is');
+  ok(excelErrorText('NAME') === '#NAME?' && excelErrorText('NA') === '#N/A' && excelErrorText('DIV_BY_ZERO') === '#DIV/0!' && excelErrorText('VALUE') === '#VALUE!',
+    'error values are written as Excel shows them (#NAME?, never "#N/AME")');
+  const name = gradeFormula(kg, '=A2&kg');
+  ok(name.reason === 'error-value' && /#NAME\?/.test(name.feedback) && /quotes/.test(name.feedback), 'an unquoted word gives #NAME? and the explanation about text in quotes', show(name));
+
+  // ---- the app fails, the learner must not pay for it
+  const PARSE_FAIL = { error: '#ERROR', message: 'Parsing error. injected' };
+  const parseAll = (grid, f, target, fillTo) => {
+    const t = parseAddr(target); const e = fillTo ? parseAddr(fillTo) : t; const cells = [];
+    for (let r = t.row; r <= e.row; r++) for (let c = t.col; c <= e.col; c++) cells.push({ addr: `${idxToCol(c)}${r + 1}`, value: PARSE_FAIL });
+    return { cells, spill: null };
+  };
+  const forced = (fn, f) => { clearFormulaCache(); setEvaluatorForTests(fn); try { return gradeFormula(kg, f); } finally { setEvaluatorForTests(null); clearFormulaCache(); } };
+  const p1 = forced(parseAll, '=SUBSTITUTE(A2," kg","")*1');
+  ok(is(p1, OUTCOME.NOT_EVALUABLE, 'parser') && p1.noMistake && !isRecordable(p1.outcome) && /couldn't check/.test(p1.feedback) && /Parsing error/.test(p1.technical || ''),
+    '11. the parser fails on a valid formula -> NOT_EVALUABLE, not recorded; the engine text only under technical details', show(p1));
+  const p2 = forced(parseAll, '=VALUE(SUBSTITUTE(A2," kg,""))');
+  ok(is(p2, OUTCOME.INCORRECT, 'syntax'), '11b. with the parser failing, a formula with a real mistake is still the learner\'s mistake', show(p2));
+  const ev = forced(() => ({ engineError: 'evaluator exploded (injected)' }), '=SUBSTITUTE(A2," kg","")*1');
+  ok(is(ev, OUTCOME.EVALUATION_ERROR, 'engine') && !isRecordable(ev.outcome) && ev.technical, '12. the evaluator fails -> EVALUATION_ERROR, not recorded', show(ev));
+  const ast = forced(() => ({ engineError: 'There is no AST with such key in the cache.' }), '=--SUBSTITUTE(A2," kg","")');
+  ok(is(ast, OUTCOME.EVALUATION_ERROR, 'engine') && !isRecordable(ast.outcome) && !/AST|cache/.test(ast.feedback), '13. the AST cache fails -> EVALUATION_ERROR, and the learner never sees "AST" or "cache"', show(ast));
+  const astModel = forced(() => ({ engineError: 'There is no AST with such key in the cache.' }), kg.answer);
+  ok(is(astModel, OUTCOME.CORRECT, 'text-match'), '13b. the AST cache fails but the answer is the model answer -> CORRECT by text match', show(astModel));
+  let crashed = null;
+  try { forced(() => { throw new Error('injected crash'); }, kg.answer); } catch (e) { crashed = e; }
+  ok(crashed && /injected crash/.test(crashed.message), 'a crash inside the grader surfaces to gradeSafely (which turns it into EVALUATION_ERROR: see npm run smoke)');
+  const after = gradeFormula(kg, '=SUBSTITUTE(A2," kg","")*1');
+  ok(is(after, OUTCOME.CORRECT, 'correct'), 'after each injected failure the next check is normal again (no broken state or cached failure left behind)', show(after));
+
+  // ---- the same holds for every formula in the academy
+  const outsideQuotes = (f, fn) => f.split(/("(?:[^"]|"")*")/).map((p, i) => (i % 2 ? p : fn(p))).join('');
+  const harmless = (a) => [`=${a}`, outsideQuotes(a, (p) => p.toLowerCase()), `  ${a}  `, a.replace(/^=/, '= '), outsideQuotes(a, (p) => p.replace(/,/g, ', '))];
+  const broken = [];
+  for (const it of items) for (const v of harmless(it.answer)) { const r = gradeFormula(it, v); if (!r.correct) broken.push(`${it.id}: ${v} -> ${r.reason}`); }
+  ok(broken.length === 0, `all ${items.length} formula tasks: the model answer typed with a doubled "=", in lower case, with extra spaces still counts as right (${items.length * 5} checks)`, broken.slice(0, 5).join(' | '));
+  const alarms = items.flatMap((it) => [it.answer, ...(it.accept || [])]).filter((f) => syntaxProblem(f));
+  ok(alarms.length === 0, 'the syntax checker finds nothing wrong in any model or accepted answer (it can only blame real mistakes)', alarms.slice(0, 3).join(' | '));
+  const validTricky = ['=-A2', '=A2*-1', '=A2^-2', '=A2%', '=(A2)', '=SUM(A2:A5,)', '=IF(A2>=5,"x","")', '=A2<>B2', '=A2&" "&B2', '={1,2,3}', '={1,-2;3,4}', '=SUM(A2 A3)',
+    '="a""b"', '=+A2', "='My sheet'!A2", '=IFERROR(A2/B2,#N/A)', '=A2=#DIV/0!', '=1.5E-3*A2', '=TODAY()', '=--A2', '=INDEX(A2:C5,2,)', '=SUM(A:A)'];
+  const flagged = validTricky.filter((f) => syntaxProblem(f));
+  ok(flagged.length === 0, `${validTricky.length} unusual but valid Excel formulas are never called syntax mistakes`, flagged.join(' | '));
+  const realMistakes = ['=C2*', '=C2*/2', '=C2==3', '=SUM(A2:A5))', '=IF(A2>1,"yes,"no")', '=(*A2)', '=SUM(A2,*B2)'];
+  const missed = realMistakes.filter((f) => !syntaxProblem(f));
+  ok(missed.length === 0, `${realMistakes.length} mistakes Excel would reject are each explained`, missed.join(' | '));
+  const fnModel = items.flatMap((it) => [it.answer, ...(it.accept || [])]).filter((f) => { const c = checkFunctions(f); return c.unknown.length || c.sheetsOnly.length || c.unsupported.length; });
+  ok(fnModel.length === 0, 'every function in every model answer is a real Excel function the calculator can run', fnModel.slice(0, 3).join(' | '));
+  ok(cleanFormulaInput('\u200B=\uFF1DSUM(A1)').text === '=SUM(A1)', 'invisible characters and a full-width "=" are cleaned away before checking');
+}
+
 section('SQL grading');
 {
   const sqlItems = Object.values(content.items).filter((i) => i.type === 'sql');
