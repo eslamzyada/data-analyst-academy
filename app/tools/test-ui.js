@@ -473,7 +473,11 @@ const scenarios = {
     await b.waitFor(`/Your skills/.test(document.body.innerText)`, { label: 'home', timeout: 8000 });
     const home = await b.text();
     check('journey: Home says it is getting to know the learner', /Getting to know your level/.test(home), home.slice(0, 300));
-    check('journey: Home recommends the current beginner topic and no Real Analyst work yet', /Formulas & cell references/.test(home) && !/Open the request/.test(home), home.slice(0, 400));
+    // the focus card itself (the Excel skill card also names this topic, so the page text alone proves nothing)
+    const focusCard = await b.evaluate(`document.querySelector('.main-cta')?.innerText || ''`);
+    const homeApi = await api('GET', '/api/home');
+    check('journey: Home keeps the learner on the topic in hand (not another tool) and shows no Real Analyst work yet',
+      homeApi.focus.topicId === 'xl-basics' && /Formulas & cell references/.test(focusCard) && !/Open the request/.test(home), `${homeApi.focus.topicId} | ${focusCard.slice(0, 200)}`);
     // a topic without a challenge has no Challenge tab; an old link to it opens the lesson
     await b.goto(`${BASE}/#/topic/pbi-intro?tab=challenge`);
     await b.waitFor(`/What Power BI is/.test(document.body.innerText)`, { label: 'pbi intro', timeout: 8000 }).catch(() => {});

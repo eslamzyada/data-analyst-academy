@@ -403,7 +403,7 @@ section('cold start: a brand-new learner');
   const path = content.topics.filter((t) => t.skill === 'pbi').map((t) => t.id);
   ok(engine.nextTopicInSkill('pbi')?.id === 'pbi-intro', 'Power BI starts at "What Power BI is"');
   const at = (id) => path.indexOf(id);
-  ok(at('pbi-import') < at('pbi-model') && at('pbi-model') < at('pbi-visuals') && at('pbi-visuals') < at('pbi-reports') && at('pbi-reports') < at('pbi-star') && at('pbi-reports') < at('pbi-dax'),
+  ok(at('pbi-import') < at('pbi-model') && at('pbi-model') < at('pbi-visuals') && at('pbi-visuals') < at('pbi-reports') && at('pbi-reports') < at('pbi-pq') && at('pbi-reports') < at('pbi-star') && at('pbi-reports') < at('pbi-dax'),
     'Power BI path: what it is, getting data in, how tables connect, a first simple report, and only then star schemas and DAX', path.join(' > '));
   const intro = content.topicMap['pbi-intro'];
   const qs = []; for (let i = 0; i < 20; i++) qs.push(...engine.drawQuiz([{ topic: intro }], 6, { mark: false, generated: false }));

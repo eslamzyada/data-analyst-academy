@@ -663,6 +663,8 @@ try {
     check('SAFETY: the dev server checks before it empties anything', dev.status !== 0 && /refused/.test(dev.stderr) && !fs.existsSync(outside), `${dev.status} ${dev.stderr.slice(0, 200)}`);
     const fixture = spawnSync(process.execPath, ['tools/fixture.js', outside, '--force'], { cwd: APP, encoding: 'utf8', timeout: 20000 });
     check('SAFETY: the fixture builder refuses a folder outside the temporary folder', fixture.status !== 0 && /refused/.test(fixture.stderr) && !fs.existsSync(outside), `${fixture.status} ${fixture.stderr.slice(0, 200)}`);
+    // if a check above failed, the refused folder may exist after all: remove exactly that test folder
+    if (fs.existsSync(outside) && path.basename(outside) === 'no-such-test-folder') fs.rmSync(outside, { recursive: true, force: true });
   }
 } catch (e) {
   check('no exceptions', false, e.stack);
