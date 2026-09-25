@@ -474,6 +474,13 @@ const scenarios = {
     const home = await b.text();
     check('journey: Home says it is getting to know the learner', /Getting to know your level/.test(home), home.slice(0, 300));
     check('journey: Home recommends the current beginner topic and no Real Analyst work yet', /Formulas & cell references/.test(home) && !/Open the request/.test(home), home.slice(0, 400));
+    // a topic without a challenge has no Challenge tab; an old link to it opens the lesson
+    await b.goto(`${BASE}/#/topic/pbi-intro?tab=challenge`);
+    await b.waitFor(`/What Power BI is/.test(document.body.innerText)`, { label: 'pbi intro', timeout: 8000 }).catch(() => {});
+    const pbi = await b.evaluate(`({ tabs: [...document.querySelectorAll('.pill-toggle button, .tabs button')].map((x) => x.textContent.trim()), text: document.querySelector('.main')?.innerText || '' })`);
+    check('journey: Power BI starts at its introduction, with no dead-end Challenge tab', !pbi.tabs.includes('Challenge') && !/Try the projects/.test(pbi.text) && /What is it\?/i.test(pbi.text), JSON.stringify(pbi.tabs));
+    await b.goto(`${BASE}/#/`);
+    await b.waitFor(`/Your skills/.test(document.body.innerText)`, { label: 'home again', timeout: 8000 });
     // 16: continue training
     await b.click('Start today');
     await b.waitFor(`/Today/.test(document.body.innerText) && /Lesson|Practice|Quiz/.test(document.querySelector('.main')?.innerText || '')`, { label: 'today', timeout: 8000 }).catch(() => {});
