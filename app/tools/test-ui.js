@@ -357,6 +357,10 @@ const scenarios = {
     const setEditor = (text) => b.evaluate(`(() => { const el = document.querySelector('.cm-content'); el.focus(); document.execCommand('selectAll'); document.execCommand('insertText', false, ${JSON.stringify(text)}); return true; })()`);
     const runQuery = async () => { await b.click('Run query'); await sleep(600); };
     const header = () => b.evaluate(`document.querySelector('.db-header')?.innerText || ''`);
+    // a first visit: no draft saved by an earlier scenario (on the server or in this browser)
+    await api('DELETE', '/api/state/session:sqllab');
+    await b.goto(`${BASE}/#/`);
+    await b.evaluate(`(() => { for (const k of Object.keys(localStorage)) if (k.startsWith('sqllab:')) localStorage.removeItem(k); return true; })()`);
     await b.goto(`${BASE}/#/sql`);
     await b.waitFor(`!!document.querySelector('.db-header') && !!document.querySelector('.cm-content')`, { label: 'SQL Lab', timeout: 10000 });
     const h = await header();
