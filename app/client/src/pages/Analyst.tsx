@@ -28,6 +28,14 @@ export default function Analyst() {
         <div className="small muted">{done} of {data.tasks.length} done</div>
       </div>
 
+      <div className={`card analyst-intro ${data.readiness && !data.readiness.ready ? 'early' : ''}`}>
+        <b>Nobody will tell you which tool to use. Your job is to investigate.</b>
+        <p className="small" style={{ margin: '6px 0 0' }}>This is a step up from the topics: a real request, some data, and a question. You decide what the question really is, which data you need, which tool fits, and what the numbers mean.</p>
+        {data.readiness && !data.readiness.ready && (
+          <p className="small muted" style={{ margin: '8px 0 0' }}>{data.readiness.why} You can still look around and try one now.</p>
+        )}
+      </div>
+
       <div className="grid two">
         {due ? (
           <div className="card arrival">

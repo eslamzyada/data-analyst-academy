@@ -28,7 +28,7 @@ export function SaveIndicator() {
   if (status === 'idle') return null;
   return (
     <span className={`saveflag saveflag-${status}`} aria-live="polite">
-      {status === 'saving' ? 'Saving…' : status === 'saved' ? 'Saved ✓' : 'Not saved yet - retrying'}
+      {status === 'saving' ? 'Saving…' : status === 'saved' ? 'Saved ✓' : "We couldn't save your progress yet. Retrying: keep this page open."}
     </span>
   );
 }

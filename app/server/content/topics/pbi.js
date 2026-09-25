@@ -5,94 +5,6 @@ const PACK = { label: 'cedarline_powerbi_pack.zip (fact_sales + 3 dimensions)', 
 const TARGETS = { label: 'store_targets_summer_2026.csv', path: 'powerquery/store_targets_summer_2026.csv' };
 
 export const PBI_EXTRA = [
-  // ================================================================ Power Query inside Power BI
-  {
-    id: 'pbi-pq', skill: 'pbi', level: 'Beginner', title: 'Power Query inside Power BI', minutes: 15,
-    prereqs: ['pbi-import'], after: 'pbi-import',
-    summary: 'Shape tables before they reach the model: types, columns, new columns and staging queries.',
-    lesson: `
-### Where it is
-In Power BI Desktop: **Home → Transform data**. The window that opens is the same Power Query editor you may know from Excel. Everything you do there is recorded in **Applied Steps** and replayed on every refresh.
-
-### The panes
-| Pane | What it is for |
-|---|---|
-| **Queries** (left) | one query per table you load |
-| **Preview** (middle) | the data after the selected step |
-| **Applied Steps** (right) | every transformation, in order; click one to go back in time |
-| **Formula bar** | the M code of the selected step (View → Formula Bar if hidden) |
-
-### A good first pass on a fact table
-1. **Check types first.** A number column shown with *ABC* is text: sums will fail or be wrong. Dates must be *Date*, not text.
-2. **Remove columns** you will never use. Fewer columns = smaller, faster model.
-3. **Rename** columns and queries so they read well in the field list (\`fact_sales\` → *Sales*).
-4. **Add columns** only when they belong to the row (e.g. *Year* from the order date). Ratios and totals belong in DAX measures, not here.
-5. **Close & Apply** loads the result into the model.
-
-### Staging queries
-A query you only need as a step for another one (for example a raw file that is merged into a clean table) can have **Enable load** switched off (right-click the query). It still runs, but it does not appear as a table in the model.
-
-### Reference vs Duplicate
-- **Reference** starts a new query from the *result* of an existing one. Change the original and the reference follows.
-- **Duplicate** copies all the steps. The two queries then live separate lives.
-
-### Power Query or DAX?
-| Do it in Power Query | Do it in DAX |
-|---|---|
-| fix types, trim, split, remove rows | totals, ratios, % of total |
-| combine files, merge lookup columns | anything that must react to slicers |
-| columns that describe one row | time intelligence, rankings |
-
-A simple rule: **clean and shape in Power Query, calculate in DAX.**`,
-    tryIt: {
-      id: 'pbi-pq-try', type: 'mc', kind: 'tool-selection', difficulty: 1, concept: 'pbi-query',
-      prompt: 'You changed three columns to the right types in the Power Query editor, but the report still shows the old types. What did you forget?',
-      options: ['Publish the report to the Service', 'Close & Apply to load the changes', 'Create a measure for each column', 'Refresh the visual on the canvas'],
-      answer: 1, hints: ['Changes in the editor are not in the model until they are loaded.'],
-      explain: 'Power Query changes only reach the model when you **Close & Apply** (or Apply). Until then the model still holds the previous load.',
-    },
-    practice: [
-      {
-        id: 'pbi-pq-p1', type: 'numbers', title: 'Shape fact_sales in Power Query', difficulty: 2, concept: 'pbi-query', business: 'Retail', minutes: 20,
-        skills_tested: ['pbi-query', 'pq-types'],
-        context: 'Cedarline\'s analyst wants a clean sales table before building anything. You will add a Year column and check how many sales lines each year has, and how often discounts are given.',
-        prompt: 'Load **fact_sales.csv** with **Transform data**. Make sure *order_date* is a Date and *discount_pct* is a decimal number. Add a **Year** column (Add Column → Date → Year → Year) and use **Group By** on Year (count rows) to answer the first two questions. For the third, filter *discount_pct* to values greater than 0 (all years).',
-        files: [PACK], dataset: 'cedarline-pbi', answersKey: 'pbi-pq-shape',
-        questions: [{ label: 'Sales lines in 2025' }, { label: 'Sales lines in 2026' }, { label: 'Discounted sales lines (discount_pct > 0), all years' }],
-        hints: [
-          'If Year is greyed out, order_date is still text: change its type to Date first.',
-          'Group By with "Count Rows" gives one row per year. For the discount question, do it in a separate query (Reference) so the grouped query stays as it is.',
-        ],
-        explain: 'Group By is Power Query\'s PivotTable: one row per year with a count. The discount count tells you how common promotions are before you measure what they cost. Keeping the grouped result in its own referenced query leaves the clean fact table untouched for the model.',
-      },
-      {
-        id: 'pbi-pq-p2', type: 'numbers', title: 'Profile the product table', difficulty: 2, concept: 'pbi-query', business: 'Retail', minutes: 15,
-        skills_tested: ['pbi-query', 'pq-group'],
-        context: 'The category manager asks how the range is made up before any sales analysis: how many products are still active, which category has the widest range, and what an active tent costs on average.',
-        prompt: 'In Power Query, use **dim_product.csv**. Filter and group to answer the questions.',
-        files: [PACK], dataset: 'cedarline-pbi', answersKey: 'pbi-pq-products',
-        questions: [{ label: 'Active products (is_active = 1)' }, { label: 'Category with the most products (active or not)' }, { label: 'Average list price of ACTIVE tents', unit: '$' }],
-        hints: ['is_active is 1 for the normal range and 0 for products being phased out.', 'Group By category with Count Rows; for the last question filter both category and is_active, then use Statistics → Average on list_price.'],
-        explain: 'A product table is small, but profiling it first avoids surprises later: three products are being phased out, and averages change depending on whether you include them. Tents have the widest range, which matters when you compare category totals.',
-      },
-    ],
-    challenge: {
-      id: 'pbi-pq-ch', type: 'numbers', title: 'Is list price the price we charged?', difficulty: 3, concept: 'pbi-query', business: 'Retail', minutes: 25,
-      skills_tested: ['pbi-query', 'pq-merge', 'data-quality'],
-      context: 'A manager wants to measure discounting as "list price minus the price charged". Before anyone builds that, check whether dim_product[list_price] is really the price at the time of each sale.',
-      prompt: 'In Power Query, **Merge** fact_sales with dim_product on product_id and expand *list_price*. Add a column comparing *unit_price* with *list_price*, then count the sales lines in each case.',
-      files: [PACK], dataset: 'cedarline-pbi', answersKey: 'pbi-pq-price',
-      questions: [{ label: 'Sales lines sold ABOVE today\'s list price' }, { label: 'Sales lines sold BELOW today\'s list price (before any discount)' }],
-      hints: ['Merge Queries → choose product_id in both tables → Left Outer.', 'A conditional column (unit_price > list_price, unit_price < list_price) makes the counting easy with Group By.'],
-      explain: 'No line was ever sold above today\'s list price, but thousands were sold below it before any discount was applied. That is because list_price is the **current** price: prices went up over time. "List price minus price charged" would overstate discounting badly. The discount is already in the data (discount_pct), so use that instead. Always ask what a column means at the time of each row.',
-    },
-    cards: [
-      { id: 'pbi-pq-c1', front: 'Where do you open Power Query in Power BI Desktop?', back: 'Home → Transform data. Changes reach the model after Close & Apply.' },
-      { id: 'pbi-pq-c2', kind: 'decision', front: 'A query is only used as an input to another query. What should you switch off?', back: 'Enable load (right-click the query), so it does not appear as a table in the model.' },
-      { id: 'pbi-pq-c3', front: 'Reference vs Duplicate?', back: 'Reference starts from the result of the original query and follows its changes; Duplicate copies all the steps into an independent query.' },
-    ],
-  },
-
   // ================================================================ Date tables
   {
     id: 'pbi-datetable', skill: 'pbi', level: 'Beginner', title: 'Building a date table', minutes: 16,
@@ -241,6 +153,94 @@ A number without context is weak. Show it **against something**: last year, targ
       { id: 'pbi-reports-c1', front: 'Where should KPI cards go on a page?', back: 'Top-left, where people start reading, with context (target, last year) next to each number.' },
       { id: 'pbi-reports-c2', front: 'What is drill-through?', back: 'A detail page opened from a right-click on a data point, already filtered to that item.' },
       { id: 'pbi-reports-c3', kind: 'decision', front: 'Descriptive or informative title?', back: 'Informative: say what the reader should see ("Revenue up 21% on last August"), not just what the chart is.' },
+    ],
+  },
+
+  // ================================================================ Power Query inside Power BI
+  {
+    id: 'pbi-pq', skill: 'pbi', level: 'Beginner', title: 'Power Query inside Power BI', minutes: 15,
+    prereqs: ['pbi-import'], after: 'pbi-reports',
+    summary: 'Shape tables before they reach the model: types, columns, new columns and staging queries.',
+    lesson: `
+### Where it is
+In Power BI Desktop: **Home → Transform data**. The window that opens is the same Power Query editor you may know from Excel. Everything you do there is recorded in **Applied Steps** and replayed on every refresh.
+
+### The panes
+| Pane | What it is for |
+|---|---|
+| **Queries** (left) | one query per table you load |
+| **Preview** (middle) | the data after the selected step |
+| **Applied Steps** (right) | every transformation, in order; click one to go back in time |
+| **Formula bar** | the M code of the selected step (View → Formula Bar if hidden) |
+
+### A good first pass on a fact table
+1. **Check types first.** A number column shown with *ABC* is text: sums will fail or be wrong. Dates must be *Date*, not text.
+2. **Remove columns** you will never use. Fewer columns = smaller, faster model.
+3. **Rename** columns and queries so they read well in the field list (\`fact_sales\` → *Sales*).
+4. **Add columns** only when they belong to the row (e.g. *Year* from the order date). Ratios and totals belong in DAX measures, not here.
+5. **Close & Apply** loads the result into the model.
+
+### Staging queries
+A query you only need as a step for another one (for example a raw file that is merged into a clean table) can have **Enable load** switched off (right-click the query). It still runs, but it does not appear as a table in the model.
+
+### Reference vs Duplicate
+- **Reference** starts a new query from the *result* of an existing one. Change the original and the reference follows.
+- **Duplicate** copies all the steps. The two queries then live separate lives.
+
+### Power Query or DAX?
+| Do it in Power Query | Do it in DAX |
+|---|---|
+| fix types, trim, split, remove rows | totals, ratios, % of total |
+| combine files, merge lookup columns | anything that must react to slicers |
+| columns that describe one row | time intelligence, rankings |
+
+A simple rule: **clean and shape in Power Query, calculate in DAX.**`,
+    tryIt: {
+      id: 'pbi-pq-try', type: 'mc', kind: 'tool-selection', difficulty: 1, concept: 'pbi-query',
+      prompt: 'You changed three columns to the right types in the Power Query editor, but the report still shows the old types. What did you forget?',
+      options: ['Publish the report to the Service', 'Close & Apply to load the changes', 'Create a measure for each column', 'Refresh the visual on the canvas'],
+      answer: 1, hints: ['Changes in the editor are not in the model until they are loaded.'],
+      explain: 'Power Query changes only reach the model when you **Close & Apply** (or Apply). Until then the model still holds the previous load.',
+    },
+    practice: [
+      {
+        id: 'pbi-pq-p1', type: 'numbers', title: 'Shape fact_sales in Power Query', difficulty: 2, concept: 'pbi-query', business: 'Retail', minutes: 20,
+        skills_tested: ['pbi-query', 'pq-types'],
+        context: 'Cedarline\'s analyst wants a clean sales table before building anything. You will add a Year column and check how many sales lines each year has, and how often discounts are given.',
+        prompt: 'Load **fact_sales.csv** with **Transform data**. Make sure *order_date* is a Date and *discount_pct* is a decimal number. Add a **Year** column (Add Column → Date → Year → Year) and use **Group By** on Year (count rows) to answer the first two questions. For the third, filter *discount_pct* to values greater than 0 (all years).',
+        files: [PACK], dataset: 'cedarline-pbi', answersKey: 'pbi-pq-shape',
+        questions: [{ label: 'Sales lines in 2025' }, { label: 'Sales lines in 2026' }, { label: 'Discounted sales lines (discount_pct > 0), all years' }],
+        hints: [
+          'If Year is greyed out, order_date is still text: change its type to Date first.',
+          'Group By with "Count Rows" gives one row per year. For the discount question, do it in a separate query (Reference) so the grouped query stays as it is.',
+        ],
+        explain: 'Group By is Power Query\'s PivotTable: one row per year with a count. The discount count tells you how common promotions are before you measure what they cost. Keeping the grouped result in its own referenced query leaves the clean fact table untouched for the model.',
+      },
+      {
+        id: 'pbi-pq-p2', type: 'numbers', title: 'Profile the product table', difficulty: 2, concept: 'pbi-query', business: 'Retail', minutes: 15,
+        skills_tested: ['pbi-query', 'pq-group'],
+        context: 'The category manager asks how the range is made up before any sales analysis: how many products are still active, which category has the widest range, and what an active tent costs on average.',
+        prompt: 'In Power Query, use **dim_product.csv**. Filter and group to answer the questions.',
+        files: [PACK], dataset: 'cedarline-pbi', answersKey: 'pbi-pq-products',
+        questions: [{ label: 'Active products (is_active = 1)' }, { label: 'Category with the most products (active or not)' }, { label: 'Average list price of ACTIVE tents', unit: '$' }],
+        hints: ['is_active is 1 for the normal range and 0 for products being phased out.', 'Group By category with Count Rows; for the last question filter both category and is_active, then use Statistics → Average on list_price.'],
+        explain: 'A product table is small, but profiling it first avoids surprises later: three products are being phased out, and averages change depending on whether you include them. Tents have the widest range, which matters when you compare category totals.',
+      },
+    ],
+    challenge: {
+      id: 'pbi-pq-ch', type: 'numbers', title: 'Is list price the price we charged?', difficulty: 3, concept: 'pbi-query', business: 'Retail', minutes: 25,
+      skills_tested: ['pbi-query', 'pq-merge', 'data-quality'],
+      context: 'A manager wants to measure discounting as "list price minus the price charged". Before anyone builds that, check whether dim_product[list_price] is really the price at the time of each sale.',
+      prompt: 'In Power Query, **Merge** fact_sales with dim_product on product_id and expand *list_price*. Add a column comparing *unit_price* with *list_price*, then count the sales lines in each case.',
+      files: [PACK], dataset: 'cedarline-pbi', answersKey: 'pbi-pq-price',
+      questions: [{ label: 'Sales lines sold ABOVE today\'s list price' }, { label: 'Sales lines sold BELOW today\'s list price (before any discount)' }],
+      hints: ['Merge Queries → choose product_id in both tables → Left Outer.', 'A conditional column (unit_price > list_price, unit_price < list_price) makes the counting easy with Group By.'],
+      explain: 'No line was ever sold above today\'s list price, but thousands were sold below it before any discount was applied. That is because list_price is the **current** price: prices went up over time. "List price minus price charged" would overstate discounting badly. The discount is already in the data (discount_pct), so use that instead. Always ask what a column means at the time of each row.',
+    },
+    cards: [
+      { id: 'pbi-pq-c1', front: 'Where do you open Power Query in Power BI Desktop?', back: 'Home → Transform data. Changes reach the model after Close & Apply.' },
+      { id: 'pbi-pq-c2', kind: 'decision', front: 'A query is only used as an input to another query. What should you switch off?', back: 'Enable load (right-click the query), so it does not appear as a table in the model.' },
+      { id: 'pbi-pq-c3', front: 'Reference vs Duplicate?', back: 'Reference starts from the result of the original query and follows its changes; Duplicate copies all the steps into an independent query.' },
     ],
   },
 

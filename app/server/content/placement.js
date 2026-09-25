@@ -1,8 +1,66 @@
-// First-run placement check: 20 quick questions. Passing a tier (2 of 3, or 1 of 1)
-// credits that tier's topics so the learning path starts at the right place.
-// area = the skill the answer credits; "pq" covers data cleaning.
+// First-run placement check: "What do I already know?", not "Can I already work as a senior
+// analyst?". It adapts as it goes (server/index.js, placementPlan):
+//   * The learner first says how much they have used each tool. "Never" skips that tool: not
+//     knowing Power BI yet is a starting point, never a failure.
+//   * Each tool starts with three genuinely basic questions (tier "Basics"). Fewer than two right:
+//     that tool starts at its first lesson, and nothing harder is asked.
+//   * Only then come the tiers that credit topics, in order (Beginner, Intermediate, Advanced);
+//     a tier is asked only after the one before it was passed (2 of 3, or 1 of 1).
+//   * "I haven't learned this yet" is always an answer. It is never recorded as a wrong answer.
+// Passing a tier credits that tier's topics (a small starting credit, confirmed later by reviews).
+// area = the skill the answer credits; "pq" covers data cleaning. Item ids are progress keys: the
+// original 20 keep their ids (only their order in the check changed).
+
+export const PLACEMENT_TOOLS = [
+  { area: 'excel', name: 'Excel' },
+  { area: 'sql', name: 'SQL' },
+  { area: 'pq', name: 'Power Query', hint: 'cleaning and combining data, in Excel or Power BI' },
+  { area: 'pbi', name: 'Power BI' },
+];
+
+/** The order of the check: per area, stages asked one after another while they are passed. */
+export const PLACEMENT_STAGES = {
+  excel: [
+    { tier: 'Basics', ids: ['pl2-xl-1', 'pl2-xl-2', 'pl2-xl-3'], pass: 2 },
+    { tier: 'Beginner', ids: ['pl-xl-b1', 'pl-xl-b2', 'pl-xl-b3'], pass: 2 },
+    { tier: 'Intermediate', ids: ['pl-xl-i1', 'pl-xl-i2', 'pl-xl-i3'], pass: 2 },
+    { tier: 'Advanced', ids: ['pl-xl-a1'], pass: 1 },
+  ],
+  sql: [
+    { tier: 'Basics', ids: ['pl2-sql-1', 'pl2-sql-2', 'pl2-sql-3'], pass: 2 },
+    { tier: 'Beginner', ids: ['pl-sql-b1', 'pl-sql-b2', 'pl-sql-b3'], pass: 2 },
+    { tier: 'Intermediate', ids: ['pl-sql-i1', 'pl-sql-i2'], pass: 2 },
+    { tier: 'Advanced', ids: ['pl-sql-a1'], pass: 1 },
+  ],
+  pq: [
+    { tier: 'Basics', ids: ['pl2-pq-1', 'pl2-pq-2', 'pl2-pq-3'], pass: 2 },
+    { tier: 'Beginner', ids: ['pl-pq-b1', 'pl-pq-b2', 'pl-pq-b3'], pass: 2 },
+  ],
+  pbi: [
+    { tier: 'Basics', ids: ['pl2-pbi-1', 'pl2-pbi-2', 'pl2-pbi-3'], pass: 2 },
+  ],
+  think: [
+    { tier: 'Basics', ids: ['pl2-th-1', 'pl2-th-2', 'pl-th-4'], pass: 2 },
+    { tier: 'Beginner', ids: ['pl-th-1', 'pl-th-2', 'pl-th-3'], pass: 2 },
+  ],
+};
 
 export const PLACEMENT = [
+  // ---- the basics: what anyone who has used the tool a little knows
+  { id: 'pl2-xl-1', area: 'excel', tier: 'Beginner', type: 'mc', concept: 'basic-agg', prompt: 'In Excel, what does the formula `=A2+B2` do?', options: ['Adds the numbers in cells A2 and B2', 'Writes the text "A2+B2" in the cell', 'Copies A2 into B2', 'Counts the cells from A2 to B2'], answer: 0 },
+  { id: 'pl2-xl-2', area: 'excel', tier: 'Beginner', type: 'mc', concept: 'basic-agg', prompt: 'Which formula adds up all the numbers in A2 to A10?', options: ['=SUM(A2:A10)', '=ADD(A2-A10)', '=TOTAL(A2,A10)', '=COUNT(A2:A10)'], answer: 0 },
+  { id: 'pl2-xl-3', area: 'excel', tier: 'Beginner', type: 'mc', concept: 'sort-filter', prompt: 'A sheet lists sales for every region. What is the quickest way to see only the rows for the West region?', options: ['Filter the Region column to West', 'Delete every row that is not West', 'Sort by Region and scroll down', 'Copy the West rows by hand'], answer: 0 },
+  { id: 'pl2-sql-1', area: 'sql', tier: 'Beginner', type: 'mc', concept: 'select-basics', prompt: 'What does `SELECT * FROM customers;` show?', options: ['Every column and row of the customers table', 'How many customers there are', 'Only the first customer', 'The names of the columns only'], answer: 0 },
+  { id: 'pl2-sql-2', area: 'sql', tier: 'Beginner', type: 'mc', concept: 'where-logic', prompt: 'Which part of a query keeps only the rows that meet a condition, like `city = \'Leeds\'`?', options: ['WHERE', 'ORDER BY', 'SELECT', 'LIMIT'], answer: 0 },
+  { id: 'pl2-sql-3', area: 'sql', tier: 'Beginner', type: 'mc', concept: 'select-basics', prompt: 'What does `ORDER BY total DESC` do?', options: ['Sorts the rows from the highest total to the lowest', 'Keeps only the row with the highest total', 'Adds all the totals together', 'Sorts the rows from the lowest total to the highest'], answer: 0 },
+  { id: 'pl2-pq-1', area: 'pq', tier: 'Beginner', type: 'mc', concept: 'pq-basics', prompt: 'What is Power Query mainly used for?', options: ['Getting data in and cleaning it before you analyse it', 'Drawing charts for a presentation', 'Sending finished reports by email', 'Protecting a workbook with a password'], answer: 0 },
+  { id: 'pl2-pq-2', area: 'pq', tier: 'Beginner', type: 'mc', concept: 'pq-clean', prompt: 'A Region column holds "West", "west " and "WEST". Which cleaning makes them one value?', options: ['Trim the spaces and make the capitals match', 'Sort the column from A to Z', 'Change the column type to a number', 'Delete the column and type it again'], answer: 0 },
+  { id: 'pl2-pq-3', area: 'pq', tier: 'Beginner', type: 'mc', concept: 'pq-basics', prompt: 'You clean a file in Power Query. Next month a new file arrives with the same layout. What do you do?', options: ['Refresh: the saved steps run again on the new data', 'Repeat every cleaning step by hand', 'Build a completely new query from scratch', 'Paste the new rows under the old ones'], answer: 0 },
+  { id: 'pl2-pbi-1', area: 'pbi', tier: 'Beginner', type: 'mc', concept: 'pbi-basics', prompt: 'What is Power BI mainly used for?', options: ['Building interactive reports and dashboards from data', 'Writing and formatting long documents', 'Storing and sending company email', 'Editing photos for a website'], answer: 0 },
+  { id: 'pl2-pbi-2', area: 'pbi', tier: 'Beginner', type: 'mc', concept: 'pbi-visuals', prompt: 'In a Power BI report, what is a "visual"?', options: ['A chart, table or card that shows the data', 'A picture pasted onto the page', 'The file the data comes from', 'A password that protects the report'], answer: 0 },
+  { id: 'pl2-pbi-3', area: 'pbi', tier: 'Beginner', type: 'mc', concept: 'pbi-model', prompt: 'A Sales table and a Customers table both have a Customer ID column. What does Power BI use that for?', options: ['A relationship, so both tables can be analysed together', 'Deleting duplicate customers from both tables', 'Sorting the customers by their ID number', 'Nothing: it ignores columns with the same name'], answer: 0 },
+  { id: 'pl2-th-1', area: 'think', tier: 'Beginner', type: 'mc', concept: 'duplicates', prompt: 'A sales report counts the same order twice. What happens to the total sales?', options: ['It is too high', 'It is too low', 'Nothing: duplicates cancel out', 'The report stops working'], answer: 0 },
+  { id: 'pl2-th-2', area: 'think', tier: 'Beginner', type: 'mc', concept: 'data-trust', prompt: 'Before you trust a number in a report, what is a good first check?', options: ['Where it came from, and whether it matches another source', 'Whether it is a nice round number', 'Whether it is higher than last year', 'Whether the chart around it looks good'], answer: 0 },
   // Excel
   { id: 'pl-xl-b1', area: 'excel', tier: 'Beginner', type: 'mc', concept: 'cell-refs', prompt: 'D2 contains `=B2*$F$1`. You copy D2 to E5. What is in E5?', options: ['=B5*$F$1', '=C5*$F$1', '=C5*$G$4', '=B2*$F$1'], answer: 1 },
   { id: 'pl-xl-b2', area: 'excel', tier: 'Beginner', type: 'mc', concept: 'countif-sumif', prompt: 'What does `=SUMIF(B2:B100,"West",C2:C100)` return?', options: ['The number of West rows', 'The total of column C for rows where column B is "West"', 'The average of West', 'An error: SUMIF needs three conditions'], answer: 1 },

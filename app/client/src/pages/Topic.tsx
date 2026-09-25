@@ -14,7 +14,7 @@ export default function Topic() {
   const nav = useNavigate();
   // tab and open task live in the address, so a refresh comes back to exactly this screen
   const params = new URLSearchParams(loc.search);
-  const tab = params.get('tab') || 'learn';
+  const askedTab = params.get('tab') || 'learn';
   const taskId = params.get('task');
   const { data: t, error, reload } = useApi<any>(`/api/topics/${id}`, [id]);
 
@@ -49,7 +49,10 @@ export default function Topic() {
     );
   }
 
-  const tabs = [['learn', 'Learn'], ['practice', `Practice (${t.practice.length})`], ['quiz', `Quiz (${t.quizCount})`], ['challenge', 'Challenge']];
+  // a topic without a challenge shows no Challenge tab (it used to send a beginner off to the projects);
+  // an old link to that tab opens the lesson instead
+  const tab = askedTab === 'challenge' && !t.challenge ? 'learn' : askedTab;
+  const tabs = [['learn', 'Learn'], ['practice', `Practice (${t.practice.length})`], ['quiz', `Quiz (${t.quizCount})`], ...(t.challenge ? [['challenge', 'Challenge']] : [])];
   const lessonDone = t.lessonState === STATE.COMPLETED;
 
   async function completeLesson() {

@@ -8,8 +8,10 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { launch } from './lib/browser.js';
+const { loadContent, content } = await import('../server/content/index.js');
 
 const APP = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+loadContent(path.join(APP, 'data'));   // model answers, to play the learner who gets it right
 const PORT = 7798;
 const BASE = `http://127.0.0.1:${PORT}`;
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'academy-ui-data-'));
@@ -515,21 +517,139 @@ const scenarios = {
   async placement(b) {
     await api('POST', '/api/reset', { confirm: 'RESET' });
     await b.goto(`${BASE}/#/`);
-    await b.waitFor(`/Start assessment/.test(document.body.innerText)`, { label: 'welcome screen' });
-    await b.click('Start assessment');
-    await b.waitFor(`/1 of 20/.test(document.body.innerText)`, { label: 'assessment question 1' });
+    await b.waitFor(`/Let's start/.test(document.body.innerText)`, { label: 'welcome screen' });
+    const welcome = await b.text('body');
+    check('placement: the welcome says it is not a test, and that never-used tools are skipped', /This is not a test/.test(welcome) && /never used/i.test(welcome), welcome.slice(0, 300));
+    await b.click("Let's start");
+    await b.waitFor(`/How much have you used these tools/.test(document.body.innerText)`, { label: 'tools question' });
+    // all four choices in one go, as fast as a script can click (quick clicks once kept only the last)
+    await b.evaluate(`(() => {
+      const pick = (tool, label) => [...document.querySelectorAll('[data-tool="' + tool + '"] button')].find((x) => x.textContent === label).click();
+      pick('excel', 'A little'); pick('sql', 'Never used it'); pick('pq', 'Never used it'); pick('pbi', 'Never used it');
+      return true;
+    })()`);
+    await sleep(300);
+    const chosen = await b.evaluate(`[...document.querySelectorAll('[data-tool] button.on')].map((x) => x.closest('[data-tool]').dataset.tool + '=' + x.textContent)`);
+    check('placement: quick choices for several tools are all kept', chosen.length === 4 && chosen.includes('excel=A little') && chosen.includes('pbi=Never used it'), JSON.stringify(chosen));
+    await b.click(/^Next: a few questions/);
+    await b.waitFor(`/Question 1/.test(document.body.innerText) && !!document.querySelector('.item button.option')`, { label: 'assessment question 1' });
+    check('placement: it starts with the basics', /Excel: the basics/.test(await b.text('body')), (await b.text('body')).slice(0, 200));
+    check('placement: tools marked "never used" are shown as skipped', /SQL · skipped/.test(await b.text('body')) && /Power BI · skipped/.test(await b.text('body')));
     await pickSomething(b);
     await b.click(/^Next/);
-    await b.waitFor(`/2 of 20/.test(document.body.innerText)`, { label: 'assessment question 2' });
+    await b.waitFor(`/Question 2/.test(document.body.innerText) && !!document.querySelector('.item button.option')`, { label: 'assessment question 2' });
     await pickSomething(b);
     await sleep(900);
     await b.reload();
-    await b.waitFor(`/of 20/.test(document.body.innerText)`, { label: 'assessment after refresh', timeout: 6000 }).catch(() => {});
-    check('placement: a refresh comes back to the same question', /2 of 20/.test(await b.text()), (await b.text()).slice(0, 200));
-    check('placement: the chosen answer survives a refresh', await b.evaluate(`!!document.querySelector('.main .item button.option.sel, .item button.option.sel')`));
+    await b.waitFor(`/Question \\d/.test(document.body.innerText) && !!document.querySelector('.item button.option')`, { label: 'assessment after refresh', timeout: 6000 }).catch(() => {});
+    check('placement: a refresh comes back to the same question', /Question 2/.test(await b.text('body')), (await b.text('body')).slice(0, 200));
+    check('placement: the chosen answer survives a refresh', await b.evaluate(`!!document.querySelector('.item button.option.sel')`));
     await b.click('Back');
-    await b.waitFor(`/1 of 20/.test(document.body.innerText)`, { label: 'back to question 1' });
+    await b.waitFor(`/Question 1/.test(document.body.innerText)`, { label: 'back to question 1' });
     check('placement: earlier answers are kept too', await b.evaluate(`!!document.querySelector('.item button.option.sel')`));
+  },
+
+  // ------------------------------------------------------------ a brand-new learner, from the first screen to the second session
+  // (runs after the placement check: both start from a reset)
+  async newlearner(b) {
+    const idkClick = `(() => { const o = [...document.querySelectorAll('.item button.option')].find((x) => /haven't learned this yet/.test(x.textContent)); if (!o) return false; o.click(); return true; })()`;
+    // 1-2: open the Academy for the first time (leave the previous page first, so nothing it still
+    // saves on the way out lands after the reset)
+    await b.goto('about:blank');
+    await sleep(800);
+    await api('POST', '/api/reset', { confirm: 'RESET' });
+    await b.goto(`${BASE}/#/`);
+    await b.waitFor(`/Welcome/.test(document.body.innerText) && /Let's start/.test(document.body.innerText)`, { label: 'welcome' });
+    check('journey: a brand-new learner sees the welcome first', true);
+    await b.click("Let's start");
+    await b.waitFor(`/How much have you used these tools/.test(document.body.innerText)`, { label: 'tools' });
+    for (const t of ['excel', 'sql', 'pq', 'pbi']) await b.click('Never used it', { within: `[data-tool="${t}"]` });
+    await b.click(/^Next: a few questions/);
+    // 3: the diagnostic: a complete beginner answers "I haven't learned this yet"
+    let asked = 0;
+    for (let i = 0; i < 12; i++) {
+      await b.waitFor(`/Here's where you start/.test(document.body.innerText) || !!document.querySelector('.item button.option')`, { label: 'next diagnostic step', timeout: 8000 });
+      if (await b.evaluate(`/Here's where you start/.test(document.body.innerText)`)) break;
+      asked++;
+      await b.evaluate(idkClick);
+      await b.click(/^Next/);
+      await sleep(250);
+    }
+    check('journey: for a complete beginner the diagnostic is short: 3 basic questions, nothing advanced', asked === 3, String(asked));
+    // 4: a personal starting point, in plain words
+    const road = await b.text('body');
+    check('journey: the starting point is personal and plain (Excel from its first lesson, Power BI from zero)', /first Excel lesson/.test(road) && /What Power BI is/.test(road), road.slice(0, 500));
+    // 5: the first lesson
+    await b.click('Start my first lesson');
+    await b.waitFor(`/Formulas & cell references/.test(document.body.innerText) && /Mark (this )?lesson (as )?complete/.test(document.body.innerText)`, { label: 'first lesson', timeout: 8000 });
+    check('journey: the first lesson is the first Excel topic', /Formulas & cell references/.test(await b.text()));
+    await b.click(/Mark (this )?lesson (as )?complete/);
+    await b.waitFor(`/Lesson completed/i.test(document.body.innerText)`, { label: 'lesson completed', timeout: 6000 }).catch(() => {});
+    check('journey: the lesson is marked completed and offers the next step', /Lesson completed/i.test(await b.text()) && /Continue|Next/.test(await b.text()));
+    // 6-9: the first practice task: a wrong answer, then the right one
+    const plan = await api('GET', '/api/today');
+    const practiceId = plan.steps.find((s) => s.key === 'practice')?.itemId;
+    const planChallenge = plan.steps.find((s) => s.key === 'challenge');
+    check('journey: the first plan has no Analyst Thinking challenge (only, once the lesson is read, this topic\'s own)',
+      !planChallenge || (content.items[planChallenge.itemId]?.skill === 'excel' && content.items[planChallenge.itemId]?.topicId === plan.topicId), JSON.stringify(plan.steps.map((s) => [s.key, s.itemId])));
+    await b.goto(`${BASE}/#/task/${practiceId}`);
+    await b.waitFor(`!!document.querySelector('.formula-bar input') || !!document.querySelector('.item input[type=text]')`, { label: 'first practice task', timeout: 8000 });
+    const model = content.items[practiceId];
+    check('journey: the first practice task is an easy formula task', model && model.type === 'formula' && (model.difficulty || 2) <= 2, JSON.stringify(model && [model.id, model.type, model.difficulty]));
+    await b.type('.formula-bar input', '=1');
+    await b.click(/^Check/);
+    await b.waitFor(`!!document.querySelector('.feedback')`, { label: 'feedback on a wrong answer' });
+    const fb1 = await b.evaluate(`({ head: document.querySelector('.feedback h4')?.innerText || '', again: !![...document.querySelectorAll('button')].find((x) => /^Check again/.test(x.textContent.trim())) })`);
+    check('journey: a wrong answer says "Not quite" and offers to check again', /Not quite/.test(fb1.head) && fb1.again, JSON.stringify(fb1));
+    await b.type('.formula-bar input', model.answer, { replace: true });
+    await b.click(/^Check again/);
+    await b.waitFor(`/Correct/.test(document.querySelector('.feedback h4')?.innerText || '')`, { label: 'correct answer', timeout: 6000 }).catch(() => {});
+    const done = await b.text();
+    check('journey: the right answer is marked correct and the task completed', /Correct/.test(done) && /Completed/.test(done), done.slice(0, 300));
+    // 10: continue to the next activity
+    const nextLabel = await b.evaluate(`document.querySelector('.donebar .btn.primary')?.textContent || ''`);
+    await b.evaluate(`document.querySelector('.donebar .btn.primary')?.click()`);
+    await sleep(600);
+    check('journey: "next" leads somewhere new', nextLabel && !(await b.evaluate(`location.hash`)).includes(practiceId), nextLabel);
+    // 11-13: a short quiz, a refresh, progress kept
+    await b.goto(`${BASE}/#/quiz/topic/xl-basics`);
+    await b.waitFor(`/Question 1 of/.test(document.body.innerText)`, { label: 'first quiz' });
+    const session = (await api('GET', '/api/quiz-sessions/current?key=topic:xl-basics')).session;
+    const qs = session ? session.items : [];
+    check('journey: the first quiz keeps to the basics', qs.length > 0 && qs.filter((q) => (q.difficulty || 2) > 2).length <= 1, JSON.stringify(qs.map((q) => q.difficulty)));
+    for (let q = 1; q <= 2; q++) {
+      if (await b.evaluate(`!![...document.querySelectorAll('button')].find(x => /^Next question/.test(x.textContent.trim()))`)) await b.click(/^Next question/);
+      const p = await pickSomething(b);
+      if (p === 'input') await b.type('.main .item input[type=text]', '1');
+      await b.click(/^Check/);
+      await b.waitFor(`!!document.querySelector('.feedback')`, { label: 'quiz feedback' });
+    }
+    const at = await quizProgress(b);
+    await sleep(600);
+    await b.reload();
+    await b.waitFor(`/Question \\d+ of/.test(document.body.innerText)`, { label: 'quiz after refresh' });
+    check('journey: after a refresh the quiz is on the same question, answer kept', (await quizProgress(b)) === at && await b.evaluate(`!!document.querySelector('.main .item .feedback')`), `${at} -> ${await quizProgress(b)}`);
+    // 14-15: back to Home: a sensible recommendation
+    await b.goto(`${BASE}/#/`);
+    await b.waitFor(`/Your skills/.test(document.body.innerText)`, { label: 'home', timeout: 8000 });
+    const home = await b.text();
+    check('journey: Home says it is getting to know the learner', /Getting to know your level/.test(home), home.slice(0, 300));
+    // the focus card itself (the Excel skill card also names this topic, so the page text alone proves nothing)
+    const focusCard = await b.evaluate(`document.querySelector('.main-cta')?.innerText || ''`);
+    const homeApi = await api('GET', '/api/home');
+    check('journey: Home keeps the learner on the topic in hand (not another tool) and shows no Real Analyst work yet',
+      homeApi.focus.topicId === 'xl-basics' && /Formulas & cell references/.test(focusCard) && !/Open the request/.test(home), `${homeApi.focus.topicId} | ${focusCard.slice(0, 200)}`);
+    // a topic without a challenge has no Challenge tab; an old link to it opens the lesson
+    await b.goto(`${BASE}/#/topic/pbi-intro?tab=challenge`);
+    await b.waitFor(`/What Power BI is/.test(document.body.innerText)`, { label: 'pbi intro', timeout: 8000 }).catch(() => {});
+    const pbi = await b.evaluate(`({ tabs: [...document.querySelectorAll('.pill-toggle button, .tabs button')].map((x) => x.textContent.trim()), text: document.querySelector('.main')?.innerText || '' })`);
+    check('journey: Power BI starts at its introduction, with no dead-end Challenge tab', !pbi.tabs.includes('Challenge') && !/Try the projects/.test(pbi.text) && /What is it\?/i.test(pbi.text), JSON.stringify(pbi.tabs));
+    await b.goto(`${BASE}/#/`);
+    await b.waitFor(`/Your skills/.test(document.body.innerText)`, { label: 'home again', timeout: 8000 });
+    // 16: continue training
+    await b.click('Start today');
+    await b.waitFor(`/Today/.test(document.body.innerText) && /Lesson|Practice|Quiz/.test(document.querySelector('.main')?.innerText || '')`, { label: 'today', timeout: 8000 }).catch(() => {});
+    check('journey: continuing from Home opens today\'s plan', /Quiz/.test(await b.text()));
   },
 };
 

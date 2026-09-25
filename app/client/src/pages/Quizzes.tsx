@@ -162,6 +162,9 @@ export function Flashcards() {
 export function ExamPage() {
   const { id } = useParams();
   const [exam, setExam] = useState<any>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  // one way to load the exam, so a failure always shows a message and a way to try again
+  const loadExam = () => { setLoadError(null); return api(`/api/exams/${id}`).then(setExam).catch((e) => setLoadError(e.message)); };
   const [answers, setAnswers] = useState<Record<string, any>>({});
   const [i, setI] = useState(0);
   const [result, setResult] = useState<any>(null);
@@ -180,12 +183,12 @@ export function ExamPage() {
       setExam({ ...s.exam, items: [] }); setResult(s.result); setSeconds(s.seconds || 0); setStarted(true);
     } else if (s && !s.finished && s.ids) {
       api('/api/items/by-ids', { ids: s.ids }).then((r) => {
-        if (!r.items || r.items.length !== s.ids.length) { api(`/api/exams/${id}`).then(setExam); return; }
+        if (!r.items || r.items.length !== s.ids.length) { loadExam(); return; }
         setExam({ ...s.exam, items: r.items });
         setAnswers(s.answers || {}); setI(s.index || 0); setSeconds(s.seconds || 0); setStarted(true); setResumed(true);
-      }).catch(() => api(`/api/exams/${id}`).then(setExam));
+      }).catch(() => loadExam());
     } else {
-      api(`/api/exams/${id}`).then(setExam);
+      loadExam();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loaded, id]);
@@ -208,7 +211,16 @@ export function ExamPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [started, result, exam, answers, i, seconds]);
 
-  if (!exam) return <Loading />;
+  if (!exam && loadError) {
+    return (
+      <div className="card" role="alert" style={{ maxWidth: 640 }}>
+        <h3 style={{ marginTop: 0 }}>This exam could not be opened</h3>
+        <p className="small">{loadError}. Nothing has been lost: any answers you gave are saved.</p>
+        <div className="row"><button className="btn primary" onClick={loadExam}><Icon name="refresh" size={15} />Try again</button><Link className="btn ghost" to="/quizzes">All quizzes and exams</Link></div>
+      </div>
+    );
+  }
+  if (!exam) return <Loading text="Opening the exam…" />;
   if (!started) {
     return (
       <div className="card" style={{ maxWidth: 640 }}>
@@ -236,7 +248,7 @@ export function ExamPage() {
   function again() {
     clear();
     setResult(null); setAnswers({}); setI(0); setSeconds(0); setStarted(false); setResumed(false); setExam(null);
-    api(`/api/exams/${id}`).then(setExam);
+    loadExam();
   }
   if (result) {
     return (

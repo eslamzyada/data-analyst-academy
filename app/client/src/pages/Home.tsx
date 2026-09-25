@@ -11,12 +11,18 @@ export default function Home() {
   if (!h) return <Loading />;
   const f = h.focus;
   const last = h.profile.lastActivity;
+  const phase = h.phase?.phase || 'personalized';
+  const isNew = phase === 'new';
+  // Real Analyst work is suggested once the learner is ready (the page itself is always open)
+  const analystReady = !!h.analyst?.readiness?.ready;
   return (
     <div>
       <div className="page-head">
         <div>
-          <h1>Welcome back{h.profile.name ? `, ${h.profile.name}` : ''}.</h1>
-          <p>{h.milestones.achieved} of {h.milestones.total} milestones earned{h.milestones.next && <> · next: <b>{h.milestones.next.name}</b> ({h.milestones.next.met} of {h.milestones.next.total} requirements met)</>}</p>
+          <h1>{isNew ? 'Welcome' : 'Welcome back'}{h.profile.name ? `, ${h.profile.name}` : ''}.</h1>
+          {isNew
+            ? <p>Your first lesson is ready. Take it one step at a time: each step tells you what comes next.</p>
+            : <p>{h.milestones.achieved} of {h.milestones.total} milestones earned{h.milestones.next && <> · next: <b>{h.milestones.next.name}</b> ({h.milestones.next.met} of {h.milestones.next.total} requirements met)</>}</p>}
         </div>
         <div className="row">
           <Link to="/quick" className="btn"><Icon name="bolt" size={16} />Quick practice</Link>
@@ -29,23 +35,44 @@ export default function Home() {
           <Icon name="medal" size={20} /> <b>New milestone earned:</b> {h.milestones.awarded.join(', ')}. <Link to="/progress">See what it took</Link>
         </div>
       )}
+      {phase === 'calibrating' && (
+        <div className="card calibrating" role="status">
+          <Icon name="target" size={16} /> <b>Getting to know your level…</b> <span className="small muted">{h.phase.answers} of {h.phase.needed} answers so far. Until then, questions stay close to the basics and get harder as you show you're ready.</span>
+        </div>
+      )}
       <div className="hero">
         <div className="card main-cta" style={{ padding: 26 }}>
-          <div className="label" style={{ color: '#dbe7ff' }}>Data Analyst Mastery</div>
-          <div className="row between" style={{ marginTop: 6 }}>
-            <span style={{ fontSize: 15 }}>Overall progress</span><b style={{ fontSize: 22 }}>{h.overall}%</b>
-          </div>
-          <Bar value={h.overall} size="thick" />
-          <div className="divider" style={{ background: 'rgba(255,255,255,0.2)' }} />
-          <div className="label" style={{ color: '#dbe7ff' }}>Today's focus</div>
-          <h2 style={{ margin: '4px 0 2px' }}>{f.skillName} · {f.topic.level}</h2>
-          <div style={{ fontSize: 17, marginBottom: 6 }}>Current topic: <b>{f.topic.title}</b></div>
-          <p className="muted" style={{ margin: '0 0 16px' }}>{f.reason}{h.focusAdapt && <><br /><span style={{ color: '#fff' }}>{h.focusAdapt.message}</span></>}</p>
-          <div className="row">
-            <button className="btn primary lg" onClick={() => nav('/today')}><Icon name="play" size={16} />Start today</button>
-            <button className="btn ghost" onClick={() => nav(`/topic/${f.topic.id}`)}>{f.topic.lessonDone ? 'Open topic' : 'Start lesson'}</button>
-            {h.today && <span className="small" style={{ color: '#dbe7ff' }}>Today: {h.today.done}/{h.today.steps} steps done</span>}
-          </div>
+          {isNew ? (
+            <>
+              <div className="label" style={{ color: '#dbe7ff' }}>Your first lesson</div>
+              <h2 style={{ margin: '4px 0 2px' }}>{f.skillName} · {f.topic.title}</h2>
+              <p className="muted" style={{ margin: '4px 0 12px' }}>{f.reason}</p>
+              <ol className="first-steps small">
+                <li>Read the short lesson</li><li>Try the example yourself</li><li>Do a first practice task</li><li>Take a short quiz</li>
+              </ol>
+              <div className="row">
+                <button className="btn primary lg" onClick={() => nav(`/topic/${f.topic.id}`)}><Icon name="play" size={16} />Start the first lesson</button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="label" style={{ color: '#dbe7ff' }}>Data Analyst Mastery</div>
+              <div className="row between" style={{ marginTop: 6 }}>
+                <span style={{ fontSize: 15 }}>Overall progress</span><b style={{ fontSize: 22 }}>{h.overall}%</b>
+              </div>
+              <Bar value={h.overall} size="thick" />
+              <div className="divider" style={{ background: 'rgba(255,255,255,0.2)' }} />
+              <div className="label" style={{ color: '#dbe7ff' }}>Today's focus</div>
+              <h2 style={{ margin: '4px 0 2px' }}>{f.skillName} · {f.topic.level}</h2>
+              <div style={{ fontSize: 17, marginBottom: 6 }}>Current topic: <b>{f.topic.title}</b></div>
+              <p className="muted" style={{ margin: '0 0 16px' }}>{f.reason}{h.focusAdapt && <><br /><span style={{ color: '#fff' }}>{h.focusAdapt.message}</span></>}</p>
+              <div className="row">
+                <button className="btn primary lg" onClick={() => nav('/today')}><Icon name="play" size={16} />Start today</button>
+                <button className="btn ghost" onClick={() => nav(`/topic/${f.topic.id}`)}>{f.topic.lessonDone ? 'Open topic' : 'Start lesson'}</button>
+                {h.today && <span className="small" style={{ color: '#dbe7ff' }}>Today: {h.today.done}/{h.today.steps} steps done</span>}
+              </div>
+            </>
+          )}
         </div>
 
         <div className="stack">
@@ -56,15 +83,15 @@ export default function Home() {
               <p className="small muted" style={{ margin: '0 0 10px' }}>An unfamiliar problem on data you have not seen. No method, no hints: you work out what to do.</p>
               <Link to={`/analyst/${h.analyst.assessment.taskId}`} className="btn primary"><Icon name="briefcase" size={14} />Open it</Link>
             </div>
-          ) : h.analyst?.recommended && (
+          ) : analystReady && h.analyst?.recommended && (
             <div className="card">
               <div className="label">Real Analyst · {h.analyst.recommended.levelName}</div>
               <h3 style={{ margin: '6px 0 4px' }}>{h.analyst.recommended.title}</h3>
-              <p className="small muted" style={{ margin: '0 0 10px' }}>A request from {h.analyst.recommended.from.name}. Nobody tells you how.</p>
+              <p className="small muted" style={{ margin: '0 0 10px' }}>A request from {h.analyst.recommended.from.name}. Nobody will tell you which tool to use. Your job is to investigate.</p>
               <Link to={`/analyst/${h.analyst.recommended.id}`} className="btn"><Icon name="briefcase" size={14} />Open the request</Link>
             </div>
           )}
-          {h.practice && (
+          {h.practice && !isNew && (
             <div className="card">
               <div className="label">Recommended practice</div>
               <h3 style={{ margin: '6px 0 4px' }}>{h.practice.title || 'Practice task'}</h3>

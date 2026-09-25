@@ -98,6 +98,24 @@ export function assessmentStatus() {
   return { due, taskId: fresh ? fresh.id : null, title: fresh ? fresh.title : null, why };
 }
 
+/**
+ * Whether Real Analyst work should be suggested yet. It is never locked (the page is always open);
+ * this decides whether Home recommends it. Ready: the app knows the learner (enough checked
+ * answers) and they have solved a first topic challenge (a business problem) with little help.
+ */
+export function readiness() {
+  const p = engine.learnerPhase();
+  const solved = store.get("SELECT COUNT(DISTINCT item_id) AS n FROM attempts WHERE source = 'challenge' AND raw_score >= 0.7 AND hints <= 1")?.n || 0;
+  const ready = p.phase === 'personalized' && solved >= 1;
+  let why = null;
+  if (!ready) {
+    why = p.phase !== 'personalized'
+      ? `Real Analyst work is the deep end: real requests with no instructions. It is suggested once you have answered about ${p.needed} questions and solved a first business challenge in a topic (${Math.min(p.answers, p.needed)} of ${p.needed} answered so far).`
+      : 'It is suggested once you have solved a first business challenge in a topic (the Challenge tab of a topic).';
+  }
+  return { ready, why, solvedChallenges: solved };
+}
+
 /** The work request to do next: the lowest level not done, moving up once two at a level are passed. */
 function recommendedRequest() {
   const reqs = content.analyst.filter((t) => t.kind === 'request');

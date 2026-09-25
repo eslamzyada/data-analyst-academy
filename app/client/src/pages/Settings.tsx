@@ -7,7 +7,7 @@ export default function Settings() {
   const [name, setName] = useState('');
   const [confirmText, setConfirmText] = useState('');
   const [toast, setToast] = useState<string | null>(null);
-  useEffect(() => { api('/api/home').then((h) => setName(h.profile.name || '')); }, []);
+  useEffect(() => { api('/api/home').then((h) => setName(h.profile.name || '')).catch(() => {}); }, []);
   return (
     <div style={{ maxWidth: 720 }}>
       <div className="page-head"><div><h1>Settings</h1><p>Your progress is stored only on this computer, in the app's data folder.</p></div></div>

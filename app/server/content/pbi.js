@@ -9,14 +9,14 @@ export const PBI = [
     summary: 'The big picture: get data → shape → model → visualise → share.',
     lesson: `
 ### What is it?
-Power BI is Microsoft's tool for building **interactive reports** from one or many data sources. Think of it as Excel's Power Query + PivotTables + charts, but built to handle millions of rows, and meant to be shared.
+Power BI is Microsoft's tool for building **interactive reports** from one or many data sources. If you have used Excel, think of PivotTables and charts that can handle millions of rows, pull data from many places, and be shared. You do not need to know anything else to start.
 
 ### The pieces
 | Piece | What it is |
 |---|---|
 | **Power BI Desktop** | the free Windows app where you build reports |
 | **Power BI Service** | the website where reports are published and shared (needs a work account) |
-| **Power Query** | the same data-cleaning engine you know from Excel |
+| **Power Query** | the part that cleans data on the way in (the same engine Excel has; it has its own topics later) |
 | **Data model** | your tables and the relationships between them |
 | **DAX** | the formula language for measures (like "Total Sales") |
 
@@ -138,6 +138,49 @@ The arrow shows how filters flow: from the **one** side (Product) to the **many*
   },
 
   {
+    id: 'pbi-visuals', skill: 'pbi', level: 'Beginner', title: 'Visuals, filters, slicers & pages', minutes: 12, prereqs: ['pbi-model'],
+    summary: 'Build a clean, interactive report page.',
+    lesson: `
+### Adding a visual
+Click a visual type in the Visualizations pane, then drag fields into its wells (Axis/X, Values/Y, Legend). Or tick fields and let Power BI choose.
+
+### Everyday visuals
+| Question | Visual |
+|---|---|
+| One key number | **Card** (or KPI) |
+| Trend over time | **Line chart** |
+| Compare categories | **Bar/column chart** (sorted) |
+| Detail | **Table / Matrix** |
+| Filter buttons | **Slicer** |
+
+### Three levels of filters (Filters pane)
+- **Visual**: only this chart
+- **Page**: every visual on this page
+- **Report**: every page
+
+### Slicers and interactions
+Slicers filter the page. Clicking a bar also **cross-filters** the other visuals. Adjust it in Format → **Edit interactions** when a visual shouldn't react.
+
+### Pages
+Use several pages: an Overview (KPIs + trend), then detail pages (by region, by product). Keep a consistent layout, the same slicers in the same place, and titles that say what to look at.`,
+    tryIt: {
+      id: 'pbi-visuals-try', type: 'mc', difficulty: 1, concept: 'pbi-visuals',
+      prompt: 'You want a Year filter that applies to every visual on the Overview page, but not to other pages. Where?',
+      options: ['Visual-level filter on one chart', 'Page-level filter (or a slicer on that page)', 'Report-level filter', 'In Power Query'], answer: 1,
+      hints: ['There are three filter levels.'], explain: 'Page-level filters and slicers affect just that page.',
+    },
+    practice: [],
+    quiz: [
+      { id: 'pbi-visuals-q1', type: 'mc', difficulty: 1, concept: 'chart-choice', prompt: 'Best visual for monthly revenue over two years?', options: ['Pie', 'Line', 'Table', 'Map'], answer: 1, explain: 'A line chart is for a value moving through time: twenty-four months read as one continuous trend. A pie compares parts of a single total, and a table hides the shape you are looking for.' },
+      { id: 'pbi-visuals-q2', type: 'mc', difficulty: 2, concept: 'pbi-visuals', prompt: 'Clicking a bar filters another chart, but you don\'t want it to. What do you change?', options: ['Delete the relationship between them', 'Format → Edit interactions → set that chart to "None"', 'Use a slicer on the page instead', 'Change the theme of the report'], answer: 1, explain: 'Edit interactions controls cross-filtering between visuals.' },
+      { id: 'pbi-visuals-q3', type: 'tf', difficulty: 1, concept: 'pbi-visuals', prompt: 'True or false: a report-level filter affects every page.', answer: true, explain: 'Filters come at three levels: visual, page and report. A report-level filter applies to every page, which is the right home for a rule such as "exclude cancelled orders".' },
+    ],
+    challenge: null,
+    cards: [
+      { id: 'pbi-visuals-c1', front: 'The 3 filter levels in Power BI?', back: 'Visual, Page, Report.' },
+    ],
+  },
+  {
     id: 'pbi-star', skill: 'pbi', level: 'Beginner', title: 'Star schema & date tables', minutes: 14, prereqs: ['pbi-model'],
     summary: 'The one model shape that keeps Power BI simple, fast and correct.',
     lesson: `
@@ -193,49 +236,6 @@ Time intelligence (YTD, last year) needs a proper **date table**: one row per da
     ],
   },
 
-  {
-    id: 'pbi-visuals', skill: 'pbi', level: 'Beginner', title: 'Visuals, filters, slicers & pages', minutes: 12, prereqs: ['pbi-star'],
-    summary: 'Build a clean, interactive report page.',
-    lesson: `
-### Adding a visual
-Click a visual type in the Visualizations pane, then drag fields into its wells (Axis/X, Values/Y, Legend). Or tick fields and let Power BI choose.
-
-### Everyday visuals
-| Question | Visual |
-|---|---|
-| One key number | **Card** (or KPI) |
-| Trend over time | **Line chart** |
-| Compare categories | **Bar/column chart** (sorted) |
-| Detail | **Table / Matrix** |
-| Filter buttons | **Slicer** |
-
-### Three levels of filters (Filters pane)
-- **Visual**: only this chart
-- **Page**: every visual on this page
-- **Report**: every page
-
-### Slicers and interactions
-Slicers filter the page. Clicking a bar also **cross-filters** the other visuals. Adjust it in Format → **Edit interactions** when a visual shouldn't react.
-
-### Pages
-Use several pages: an Overview (KPIs + trend), then detail pages (by region, by product). Keep a consistent layout, the same slicers in the same place, and titles that say what to look at.`,
-    tryIt: {
-      id: 'pbi-visuals-try', type: 'mc', difficulty: 1, concept: 'pbi-visuals',
-      prompt: 'You want a Year filter that applies to every visual on the Overview page, but not to other pages. Where?',
-      options: ['Visual-level filter on one chart', 'Page-level filter (or a slicer on that page)', 'Report-level filter', 'In Power Query'], answer: 1,
-      hints: ['There are three filter levels.'], explain: 'Page-level filters and slicers affect just that page.',
-    },
-    practice: [],
-    quiz: [
-      { id: 'pbi-visuals-q1', type: 'mc', difficulty: 1, concept: 'chart-choice', prompt: 'Best visual for monthly revenue over two years?', options: ['Pie', 'Line', 'Table', 'Map'], answer: 1, explain: 'A line chart is for a value moving through time: twenty-four months read as one continuous trend. A pie compares parts of a single total, and a table hides the shape you are looking for.' },
-      { id: 'pbi-visuals-q2', type: 'mc', difficulty: 2, concept: 'pbi-visuals', prompt: 'Clicking a bar filters another chart, but you don\'t want it to. What do you change?', options: ['Delete the relationship between them', 'Format → Edit interactions → set that chart to "None"', 'Use a slicer on the page instead', 'Change the theme of the report'], answer: 1, explain: 'Edit interactions controls cross-filtering between visuals.' },
-      { id: 'pbi-visuals-q3', type: 'tf', difficulty: 1, concept: 'pbi-visuals', prompt: 'True or false: a report-level filter affects every page.', answer: true, explain: 'Filters come at three levels: visual, page and report. A report-level filter applies to every page, which is the right home for a rule such as "exclude cancelled orders".' },
-    ],
-    challenge: null,
-    cards: [
-      { id: 'pbi-visuals-c1', front: 'The 3 filter levels in Power BI?', back: 'Visual, Page, Report.' },
-    ],
-  },
 
   {
     id: 'pbi-dax', skill: 'pbi', level: 'Beginner', title: 'First DAX measures', minutes: 15, prereqs: ['pbi-star'],

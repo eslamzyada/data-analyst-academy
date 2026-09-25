@@ -215,6 +215,15 @@ for (const p of content.projects) {
 // Real Analyst work, and every ability reachable up to Independent
 checkAnalyst({ content, err, warn, filesDir: path.join(DATA, 'files'), availability: availability() });
 
+// cold start: a new learner starts at the first topic of a skill, and its first quizzes are drawn from
+// the easy questions (adaptive.js coldStart). Content changes must leave enough of them there.
+for (const sk of content.skills) {
+  const first = content.topics.find((t) => t.skill === sk.id);
+  const easy = (first?.quiz || []).filter((i) => (i.difficulty || 2) <= 2).length;
+  if (easy < 10) err(first?.id || sk.id, `the first ${sk.name} topic needs at least 10 quiz questions of difficulty 1-2 (it has ${easy}): every new learner starts here`);
+  if (first && !(first.practice || []).length && !first.tryIt) err(first.id, `the first ${sk.name} topic needs a guided example (tryIt) or a practice task`);
+}
+
 // exams: enough questions?
 for (const e of content.exams) {
   const pool = content.topics.filter((t) => t.skill === e.skill && (!e.tier || t.level === e.tier)).flatMap((t) => t.quiz || []);

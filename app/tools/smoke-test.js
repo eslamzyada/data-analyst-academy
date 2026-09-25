@@ -66,14 +66,44 @@ try {
   await api('POST', '/api/profile', { name: 'Islam' });
 
   const pl = (await api('GET', '/api/placement')).json;
-  check('placement has 20 questions without answers', pl.questions.length === 20 && pl.questions.every((q) => q.answer === undefined));
-  // answer Excel beginner + intermediate right, SQL beginner right, the rest wrong
-  const key = { 'pl-xl-b1': 1, 'pl-xl-b2': 1, 'pl-xl-b3': 2, 'pl-xl-i1': 1, 'pl-xl-i2': 1, 'pl-xl-i3': 1, 'pl-sql-b1': 1, 'pl-sql-b2': 1, 'pl-sql-b3': 2, 'pl-th-1': 1, 'pl-th-2': 1, 'pl-th-3': 1 };
-  const plAnswers = Object.fromEntries(pl.questions.map((q) => [q.id, shown(q.id, key[q.id] ?? 3)]));
-  const placed = (await api('POST', '/api/placement', { answers: plAnswers })).json;
+  check('placement asks about 4 tools first, and its questions carry no answers', pl.tools.length === 4 && pl.questions.every((q) => q.answer === undefined), JSON.stringify(pl.tools));
+  // a never-used tool is skipped; every tool starts with the basics
+  const probe = (await api('POST', '/api/placement/next', { selfReport: { excel: 'never', sql: 'little', pq: 'little', pbi: 'never' }, answers: {} })).json;
+  check('PLACEMENT: a tool marked "never used" is skipped, and the first question is a basic one', probe.area === 'sql' && probe.stage === 'Basics' && probe.areas.find((a) => a.area === 'excel').state === 'skipped', JSON.stringify(probe).slice(0, 240));
+  check('PLACEMENT: "I haven\'t learned this yet" is offered with every question', probe.question.idkLabel === "I haven't learned this yet");
+  // fewer than 2 of the 3 basics right: nothing harder is asked about that tool
+  const idkAll = {};
+  for (let i = 0; i < 30; i++) {
+    const nx = (await api('POST', '/api/placement/next', { selfReport: { excel: 'little', sql: 'never', pq: 'never', pbi: 'never' }, answers: idkAll })).json;
+    if (nx.done) break;
+    idkAll[nx.question.id] = 'idk';
+  }
+  const idkIds = Object.keys(idkAll);
+  check('PLACEMENT: a beginner answering "I haven\'t learned this yet" only ever sees the basics (3 Excel + 3 thinking questions)', idkIds.length === 6 && idkIds.every((id) => content.items[id].id.startsWith('pl2-') || id === 'pl-th-4'), idkIds.join(','));
+
+  // the full run used below: Excel basics, beginner and intermediate right; SQL basics and beginner
+  // right; Analyst Thinking basics and beginner right; Power Query answered "I haven't learned this
+  // yet"; Power BI never used. (The same state the rest of this test was written against.)
+  const selfReport = { excel: 'regular', sql: 'little', pq: 'little', pbi: 'never' };
+  const STAGES = ['Basics', 'Beginner', 'Intermediate', 'Advanced'];
+  const firstWrong = { excel: 'Advanced', sql: 'Intermediate', pq: 'Basics', think: 'Intermediate' };
+  const plAnswers = {};
+  const plAsked = [];
+  for (let i = 0; i < 60; i++) {
+    const nx = (await api('POST', '/api/placement/next', { selfReport, answers: plAnswers })).json;
+    if (nx.done) break;
+    plAsked.push(`${nx.area}:${nx.stage}`);
+    const id = nx.question.id;
+    plAnswers[id] = STAGES.indexOf(nx.stage) < STAGES.indexOf(firstWrong[nx.area]) ? shown(id, content.items[id].answer) : 'idk';
+  }
+  check('PLACEMENT: questions come easiest first within each tool, and a tool stops at its first missed stage', plAsked[0] === 'excel:Basics' && !plAsked.includes('pq:Beginner') && !plAsked.some((a) => a.startsWith('pbi:')),
+    plAsked.join(' '));
+  const placed = (await api('POST', '/api/placement', { selfReport, answers: plAnswers })).json;
   check('placement roadmap: Excel Advanced stage', placed.roadmap.excel === 'Advanced', JSON.stringify(placed.roadmap));
   check('placement roadmap: SQL Intermediate stage', placed.roadmap.sql === 'Intermediate', JSON.stringify(placed.roadmap));
   check('placement roadmap: Power BI not started', placed.roadmap.pbi === 'Not started');
+  check('PLACEMENT: the starting point is described in plain words for every tool', ['excel', 'sql', 'pq', 'pbi', 'think'].every((k) => typeof placed.roadmapText[k] === 'string' && placed.roadmapText[k].length > 20) && /What Power BI is/.test(placed.roadmapText.pbi), JSON.stringify(placed.roadmapText));
+  check('PLACEMENT: "I haven\'t learned this yet" answers are not recorded as wrong answers', placed.results.length === Object.values(plAnswers).filter((a) => a !== 'idk').length && placed.results.every((r) => plAnswers[r.id] !== 'idk'), JSON.stringify(placed.results.length));
   check('placement suggests a start topic', !!placed.startTopic, JSON.stringify(placed));
 
   home = (await api('GET', '/api/home')).json;
@@ -81,6 +111,8 @@ try {
   check('placement credit shows as real progress (>0) but not mastery', home.overall > 0 && home.overall < 40, String(home.overall));
   const excelSkill = home.skills.find((s) => s.id === 'excel');
   check('Excel beginner topics credited, not mastered', excelSkill.progress > 0 && excelSkill.mastered === 0, JSON.stringify(excelSkill));
+  check('COLD START: after placement the learner is still new (placement answers only say where to start)', home.phase && home.phase.phase === 'new', JSON.stringify(home.phase));
+  check('COLD START: Real Analyst work is not suggested to a new learner, and its page still opens', home.analyst.readiness && home.analyst.readiness.ready === false && (await api('GET', '/api/analyst')).status === 200, JSON.stringify(home.analyst.readiness));
 
   // ---------------------------------------------------------------- learning path
   const sk = (await api('GET', '/api/skills/sql')).json;
@@ -692,6 +724,40 @@ try {
   check('PROJECTS: a checked choosing step is final', u2.status === 409);
   const ap = (await api('POST', '/api/projects/cap-waste/steps/approach', { answer: { tools: ['pbi'], why: 'The manager will watch this monthly, so a refreshing report.' } })).json;
   check('PROJECTS: more than one tool can be right for a project', ap.score > 0.7 && ap.result.tools.find((x) => x.id === 'pbi').verdict !== 'weak');
+
+  // ================================================================ SAFETY: tests only ever use temporary folders
+  // The learner's installed copy and the development worktree are separate checkouts: a server started
+  // from one does not know the other's app/data. So a test run refuses any folder outside os.tmpdir().
+  {
+    const { spawnSync } = await import('node:child_process');
+    const outside = path.join(APP, 'no-such-test-folder');     // not temporary, and must stay uncreated
+    const envFor = (dir) => ({ ...process.env, PORT: '7795', ACADEMY_DATA: dir, ACADEMY_REQUIRE_TEST_DATA: '1' });
+    const srv = spawnSync(process.execPath, ['server/index.js'], { cwd: APP, env: envFor(outside), encoding: 'utf8', timeout: 20000 });
+    check('SAFETY: a test server refuses a data folder outside the temporary folder (exit 2, nothing created)', srv.status === 2 && /temporary folder/.test(srv.stderr) && !fs.existsSync(outside), `${srv.status} ${srv.stderr.slice(0, 200)}`);
+    const real = spawnSync(process.execPath, ['server/index.js'], { cwd: APP, env: envFor(path.join(APP, 'data')), encoding: 'utf8', timeout: 20000 });
+    check('SAFETY: ...and the real progress folder of its own checkout', real.status === 2 && /real progress/.test(real.stderr), `${real.status} ${real.stderr.slice(0, 200)}`);
+    const dev = spawnSync(process.execPath, ['tools/dev-server.js', '--new-learner'], { cwd: APP, env: envFor(outside), encoding: 'utf8', timeout: 20000 });
+    check('SAFETY: the dev server checks before it empties anything', dev.status !== 0 && /refused/.test(dev.stderr) && !fs.existsSync(outside), `${dev.status} ${dev.stderr.slice(0, 200)}`);
+    const fixture = spawnSync(process.execPath, ['tools/fixture.js', outside, '--force'], { cwd: APP, encoding: 'utf8', timeout: 20000 });
+    check('SAFETY: the fixture builder refuses a folder outside the temporary folder', fixture.status !== 0 && /refused/.test(fixture.stderr) && !fs.existsSync(outside), `${fixture.status} ${fixture.stderr.slice(0, 200)}`);
+    // ================================================================ ERRORS: always plain JSON, never an HTML page
+    const bad = await fetch(`${BASE}/api/quiz-sessions`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: 'topic:no-such-topic', n: 6 }) });
+    const badText = await bad.text();
+    check('ERRORS: an error thrown inside a handler answers in plain JSON, never an HTML page or a stack trace', bad.status >= 400 && badText.trim().startsWith('{') && !!JSON.parse(badText).error && !/<html|<pre>|\bat \S+\.js:\d+/i.test(badText), badText.slice(0, 200));
+    const junk = await fetch(`${BASE}/api/profile`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{not json' });
+    const junkText = await junk.text();
+    check('ERRORS: a request that is not valid JSON gets a plain 400 message', junk.status === 400 && /could not be read/.test(junkText) && !/<html/i.test(junkText), junkText.slice(0, 200));
+    const nothere = await fetch(`${BASE}/api/no-such-thing`);
+    const nothereText = await nothere.text();
+    check('ERRORS: an unknown API path answers 404 in JSON, not the app page', nothere.status === 404 && !!JSON.parse(nothereText).error, nothereText.slice(0, 200));
+    // the app route still answers "/", not the API error handling: the page itself when the client is built,
+    // or the plain "not built yet" note when it isn't (CI's test job never builds the client)
+    const page = await fetch(`${BASE}/`);
+    const pageText = await page.text();
+    check('ERRORS: the Academy page is still answered by the app, not by the API error handling', (page.status === 200 && pageText.includes('<div id="root">')) || (page.status === 503 && /has not been built yet/.test(pageText)), `${page.status} ${pageText.slice(0, 120)}`);
+    // if a check above failed, the refused folder may exist after all: remove exactly that test folder
+    if (fs.existsSync(outside) && path.basename(outside) === 'no-such-test-folder') fs.rmSync(outside, { recursive: true, force: true });
+  }
 } catch (e) {
   check('no exceptions', false, e.stack);
 } finally {

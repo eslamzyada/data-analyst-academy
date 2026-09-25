@@ -352,7 +352,8 @@ export default function ItemRunner({
       {!exam && !locked && (item.hints > 0 || item.hasExplain || item.hasSolution)
         && !(!helpAnyway && hints === 0 && help.length === 0 && ((item.guidance === 'light' && checks < 1) || (item.guidance === 'none' && checks < 2))) && (
         <div className="helpbar">
-          {item.hints > 0 && hints < Math.min(2, item.hints) && <button className="btn sm" onClick={() => getHelp(hints + 1)}><Icon name="bulb" size={15} />{hints === 0 ? 'Hint' : 'Stronger hint'}</button>}
+          <span className="small muted help-label" title="Using help is fine. It is noted with your answer, so your progress stays honest.">Need help?</span>
+          {item.hints > 0 && hints < Math.min(2, item.hints) && <button className="btn sm" title="Shows a small nudge. Your answer stays as it is." onClick={() => getHelp(hints + 1)}><Icon name="bulb" size={15} />{hints === 0 ? 'Hint' : 'Stronger hint'}</button>}
           {item.hasExplain && hints < 3 && <button className="btn sm" onClick={() => getHelp(3)}><Icon name="learn" size={15} />Show explanation</button>}
           {item.hasSolution && <button className="btn sm ghost" onClick={() => getHelp(4)}><Icon name="eye" size={15} />Show answer</button>}
         </div>
