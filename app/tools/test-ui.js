@@ -353,7 +353,7 @@ const scenarios = {
     check('analyst: the verdict and the open part survive a refresh', await b.evaluate(`/Best fit/.test(document.querySelector('#part-tools')?.innerText || '') && !!document.querySelector('#part-decide')`));
   },
 
-  // ------------------------------------------------------------ the placement check (runs near the end: it resets progress)
+  // ------------------------------------------------------------ the placement check (runs last: it resets progress)
   async placement(b) {
     await api('POST', '/api/reset', { confirm: 'RESET' });
     await b.goto(`${BASE}/#/`);
@@ -390,6 +390,7 @@ const scenarios = {
   },
 
   // ------------------------------------------------------------ a brand-new learner, from the first screen to the second session
+  // (runs after the placement check: both start from a reset)
   async newlearner(b) {
     const idkClick = `(() => { const o = [...document.querySelectorAll('.item button.option')].find((x) => /haven't learned this yet/.test(x.textContent)); if (!o) return false; o.click(); return true; })()`;
     // 1-2: open the Academy for the first time (leave the previous page first, so nothing it still

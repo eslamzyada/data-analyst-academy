@@ -24,11 +24,11 @@ import { detectReasoning, scoreReasoning, REASONING } from './grading/reasoning.
 import { criteriaProfile, CRITERIA } from './content/criteria.js';
 import * as mastery from './mastery.js';
 import * as analyst from './analyst.js';
+import { PLACEMENT_TOOLS, PLACEMENT_STAGES } from './content/placement.js';
+import { COMPETENCY_MAP, CONCEPT_COMPETENCY } from './content/competencies.js';
 import { adaptFor, guidanceNote } from './adaptive.js';
 import { milestones } from './milestones.js';
 import { guardServerDataDir } from './safety.js';
-import { PLACEMENT_TOOLS, PLACEMENT_STAGES } from './content/placement.js';
-import { COMPETENCY_MAP, CONCEPT_COMPETENCY } from './content/competencies.js';
 
 const APP = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DATA = process.env.ACADEMY_DATA ? path.resolve(process.env.ACADEMY_DATA) : path.join(APP, 'data');
