@@ -663,6 +663,17 @@ try {
     check('SAFETY: the dev server checks before it empties anything', dev.status !== 0 && /refused/.test(dev.stderr) && !fs.existsSync(outside), `${dev.status} ${dev.stderr.slice(0, 200)}`);
     const fixture = spawnSync(process.execPath, ['tools/fixture.js', outside, '--force'], { cwd: APP, encoding: 'utf8', timeout: 20000 });
     check('SAFETY: the fixture builder refuses a folder outside the temporary folder', fixture.status !== 0 && /refused/.test(fixture.stderr) && !fs.existsSync(outside), `${fixture.status} ${fixture.stderr.slice(0, 200)}`);
+    // ================================================================ ERRORS: always plain JSON, never an HTML page
+    const bad = await fetch(`${BASE}/api/quiz-sessions`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: 'topic:no-such-topic', n: 6 }) });
+    const badText = await bad.text();
+    check('ERRORS: an error thrown inside a handler answers in plain JSON, never an HTML page or a stack trace', bad.status >= 400 && badText.trim().startsWith('{') && !!JSON.parse(badText).error && !/<html|<pre>|\bat \S+\.js:\d+/i.test(badText), badText.slice(0, 200));
+    const junk = await fetch(`${BASE}/api/profile`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{not json' });
+    const junkText = await junk.text();
+    check('ERRORS: a request that is not valid JSON gets a plain 400 message', junk.status === 400 && /could not be read/.test(junkText) && !/<html/i.test(junkText), junkText.slice(0, 200));
+    const nothere = await fetch(`${BASE}/api/no-such-thing`);
+    const nothereText = await nothere.text();
+    check('ERRORS: an unknown API path answers 404 in JSON, not the app page', nothere.status === 404 && !!JSON.parse(nothereText).error, nothereText.slice(0, 200));
+    check('ERRORS: the Academy itself still loads for the browser', (await fetch(`${BASE}/`)).status === 200);
     // if a check above failed, the refused folder may exist after all: remove exactly that test folder
     if (fs.existsSync(outside) && path.basename(outside) === 'no-such-test-folder') fs.rmSync(outside, { recursive: true, force: true });
   }

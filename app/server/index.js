@@ -1217,6 +1217,17 @@ app.post('/api/reset', wrap((req, res) => {
   res.json({ ok: true });
 }));
 
+// Every API error answers in JSON with a plain message, never Express's HTML error page (which the
+// page showed as a wall of HTML, stack trace included). This catches what wrap() cannot: a handler
+// that throws synchronously (Promise.resolve(fn()) runs fn before it can catch) and a request body
+// that is not valid JSON.
+app.use('/api', (err, req, res, next) => {
+  if (res.headersSent) return next(err);
+  const bad = err && (err.type === 'entity.parse.failed' || err instanceof SyntaxError);
+  console.error(err);
+  res.status(bad ? 400 : err && err.status ? err.status : 500).json({ error: bad ? 'The request could not be read. Try again.' : String((err && err.message) || err) });
+});
+
 // ------------------------------------------------------------------ the app itself
 const DIST = path.join(APP, 'client', 'dist');
 app.use(express.static(DIST));
