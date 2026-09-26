@@ -224,7 +224,7 @@ section('formula matrix: learner mistakes vs app problems');
     ['7. a wrong formula', '=VALUE(SUBSTITUTE(A2," kg",""))*2', OUTCOME.INCORRECT, 'wrong-result'],
     ['8. an empty answer', '', OUTCOME.NOT_EVALUABLE, 'empty'],
     ['9. extra whitespace around it', '   =VALUE(SUBSTITUTE(A2," kg",""))   ', OUTCOME.CORRECT, 'correct'],
-    ['10. a duplicated leading "="', '==SUBSTITUTE(A2, " kg", "")*1', OUTCOME.CORRECT, 'correct'],
+    ['10. a duplicated leading "=" (Excel rejects it)', '==SUBSTITUTE(A2, " kg", "")*1', OUTCOME.INCORRECT, 'syntax'],
     ['14. a real Excel function the calculator lacks', '=NUMBERVALUE(SUBSTITUTE(A2," kg",""))', OUTCOME.NOT_EVALUABLE, 'unsupported-function'],
     ['15. a wrong result: the digits come back as text', '=SUBSTITUTE(A2," kg","")', OUTCOME.INCORRECT, 'text-not-number'],
     ['16. the right result by another valid method', '=LEFT(A2,FIND(" ",A2)-1)*1', OUTCOME.CORRECT, 'correct'],
@@ -237,7 +237,10 @@ section('formula matrix: learner mistakes vs app problems');
   for (const [label, f, outcome, reason] of cases) { const r = g(f); ok(is(r, outcome, reason), `matrix ${label} -> ${outcome} (${reason})`, show(r)); }
 
   const dbl = g('==SUBSTITUTE(A2, " kg", "")*1');
-  ok(dbl.correct && /single "="/.test(dbl.notice || ''), 'a doubled "=" is read as one, and the learner is told so in a small tip', show(dbl));
+  // Owner's decision after the Codex review (Sept 2026): the box no longer starts with "=", so a
+  // typed "==" is the learner's own, and Excel rejects it. It is a checked wrong answer, explained,
+  // not logged as a concept mistake. (It used to be read as one "=" and marked right.)
+  ok(!dbl.correct && dbl.reason === 'syntax' && dbl.noMistake === true && /single "="/.test(dbl.feedback || ''), 'a doubled "=" is marked wrong as Excel would, with a plain explanation (not a concept mistake)', show(dbl));
   // Quoted text is part of the answer, so tidying the typing must never touch it. A non-breaking or
   // zero-width space in the search text makes the formula fail in Excel; cleaning it up used to
   // turn exactly that formula into the right one (found by the Codex review).
@@ -292,10 +295,12 @@ section('formula matrix: learner mistakes vs app problems');
 
   // ---- the same holds for every formula in the academy
   const outsideQuotes = (f, fn) => f.split(/("(?:[^"]|"")*")/).map((p, i) => (i % 2 ? p : fn(p))).join('');
-  const harmless = (a) => [`=${a}`, outsideQuotes(a, (p) => p.toLowerCase()), `  ${a}  `, a.replace(/^=/, '= '), outsideQuotes(a, (p) => p.replace(/,/g, ', '))];
+  const harmless = (a) => [outsideQuotes(a, (p) => p.toLowerCase()), `  ${a}  `, a.replace(/^=/, '= '), outsideQuotes(a, (p) => p.replace(/,/g, ', '))];
   const broken = [];
   for (const it of items) for (const v of harmless(it.answer)) { const r = gradeFormula(it, v); if (!r.correct) broken.push(`${it.id}: ${v} -> ${r.reason}`); }
-  ok(broken.length === 0, `all ${items.length} formula tasks: the model answer typed with a doubled "=", in lower case, with extra spaces still counts as right (${items.length * 5} checks)`, broken.slice(0, 5).join(' | '));
+  ok(broken.length === 0, `all ${items.length} formula tasks: the model answer typed in lower case or with extra spaces still counts as right (${items.length * 4} checks)`, broken.slice(0, 5).join(' | '));
+  const doubled = items.filter((it) => { const r = gradeFormula(it, `=${it.answer}`); return r.correct || r.reason !== 'syntax'; });
+  ok(doubled.length === 0, `all ${items.length} formula tasks: the model answer typed with a doubled "=" is marked wrong as Excel would (syntax)`, doubled.slice(0, 5).map((it) => it.id).join(' | '));
   const alarms = items.flatMap((it) => [it.answer, ...(it.accept || [])]).filter((f) => syntaxProblem(f));
   ok(alarms.length === 0, 'the syntax checker finds nothing wrong in any model or accepted answer (it can only blame real mistakes)', alarms.slice(0, 3).join(' | '));
   const validTricky = ['=-A2', '=A2*-1', '=A2^-2', '=A2%', '=(A2)', '=SUM(A2:A5,)', '=IF(A2>=5,"x","")', '=A2<>B2', '=A2&" "&B2', '={1,2,3}', '={1,-2;3,4}', '=SUM(A2 A3)',
@@ -361,11 +366,18 @@ section('SQL grading');
   // next one (found by the Codex review: case_sensitive_like changed an unrelated LIKE from 565 to 4
   // rows, for every later query and check, until the app restarted).
   const probe = "SELECT COUNT(*) FROM customers WHERE full_name LIKE 'a%'";
+  // first: on one plain connection this PRAGMA really changes the probe, so "unchanged" below means
+  // isolation worked, not that the PRAGMA did nothing (asked by the Codex test review)
+  const SQLJS = await (await import('sql.js')).default();
+  const plain = new SQLJS.Database(fs.readFileSync(path.join(ROOT, 'data', 'practice', 'cedarline.db')));
+  const onOne = [plain.exec(probe)[0].values[0][0], (plain.exec('PRAGMA case_sensitive_like=ON'), plain.exec(probe)[0].values[0][0])];
+  plain.close();
+  ok(onOne[0] > 0 && onOne[1] !== onOne[0], `on a single connection the PRAGMA changes the probe (${onOne[0]} -> ${onOne[1]} rows)`, JSON.stringify(onOne));
   const pBefore = await runSql('cedarline', probe);
   const pragma = await runSql('cedarline', 'PRAGMA case_sensitive_like=ON');
   const pAfter = await runSql('cedarline', probe);
-  ok(pBefore.ok && pAfter.ok && pBefore.rows[0][0] > 0 && pAfter.rows[0][0] === pBefore.rows[0][0],
-    'a PRAGMA run by one query does not change the results of the next one', `${pBefore.rows?.[0]?.[0]} -> ${pAfter.rows?.[0]?.[0]} (pragma ok=${pragma.ok})`);
+  ok(pragma.ok && pBefore.ok && pAfter.ok && pBefore.rows[0][0] === onOne[0] && pAfter.rows[0][0] === pBefore.rows[0][0],
+    'a PRAGMA run by one query (accepted) does not change the results of the next one', `${pBefore.rows?.[0]?.[0]} -> ${pAfter.rows?.[0]?.[0]} (pragma ok=${pragma.ok})`);
   const info = await runSql('cedarline', 'PRAGMA table_info(customers)');
   ok(info.ok && info.rows.some((r) => r.includes('full_name')), 'a PRAGMA that only reads (table_info) still works in the SQL Lab', JSON.stringify(info).slice(0, 160));
 }
