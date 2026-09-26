@@ -1,4 +1,5 @@
-// Runs SQL in a worker thread, one query at a time, with an 8 second limit per query.
+// Runs SQL in a worker thread, one query at a time, with a time limit per query (8 seconds;
+// ACADEMY_SQL_LIMIT_MS changes it for tests).
 //
 // Queries wait in a queue and each one's clock starts only when it actually starts running,
 // so a slow query never makes the next one look slow. If a query runs too long the worker is
@@ -57,7 +58,8 @@ function pump() {
     const w = worker;
     worker = null;                      // the handlers above ignore the dying worker
     w.terminate().catch(() => {});
-    finish({ ok: false, timeout: true, error: 'Your query ran for more than 8 seconds and was stopped. This usually means a join is missing its ON condition, so every row was matched with every other row.' });
+    // what made it slow is not known here: the help (sqlhelp.js) looks at the query itself
+    finish({ ok: false, timeout: true, limitMs: LIMIT_MS, error: `Your query ran for more than ${LIMIT_MS / 1000} seconds and was stopped. Queries on these practice databases normally finish in well under a second, so something in this one repeats far too often.` });
   }, LIMIT_MS);
   worker.postMessage({ id: running.id, db: running.db, sql: running.sql, maxRows: running.maxRows });
 }

@@ -53,6 +53,29 @@ export function flushSaves() {
   pending.clear();
 }
 
+// Drafts whose page closed before their save went through (the app may be restarting): tried again
+// here until the server has them. Without this, such a draft waited unsent until the tab closed,
+// and coming back to the work showed the older copy.
+const orphans = new Set<string>();
+let orphanTimer: any = null;
+let orphanTries = 0;
+let orphanNote: (s: SaveStatus) => void = () => {};
+function retryOrphans() {
+  clearTimeout(orphanTimer);
+  orphanTimer = setTimeout(async () => {
+    for (const key of [...orphans]) {
+      const state = pending.get(key);
+      if (state === undefined) { orphans.delete(key); continue; }
+      try {
+        await api(stateUrl(key), { state }, 'PUT');
+        if (pending.get(key) === state) pending.delete(key);
+        orphans.delete(key);
+      } catch { /* still away: next round */ }
+    }
+    if (orphans.size) { orphanTries += 1; orphanNote('error'); retryOrphans(); } else { orphanTries = 0; orphanNote('saved'); }
+  }, Math.min(10000, 1000 * (orphanTries + 1)));
+}
+
 if (typeof window !== 'undefined') {
   window.addEventListener('pagehide', flushSaves);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushSaves(); });
@@ -78,6 +101,16 @@ export function useSavedWork<T extends object>(key: string | null) {
     touched.current = false;
     setLoaded(null);
     if (!key) { setLoaded({ state: null, updatedAt: null }); return; }
+    // a draft that never reached the server is newer than the server's copy: show it, and save it
+    // from this page again
+    const unsent = pending.get(key);
+    if (unsent !== undefined) {
+      orphans.delete(key);
+      latest.current = unsent;
+      setLoaded({ state: unsent, updatedAt: null });
+      timer.current = setTimeout(() => write(), 0);
+      return () => { live = false; };
+    }
     api(stateUrl(key))
       .then((r) => live && setLoaded({ state: touched.current ? null : (r.state ?? null), updatedAt: r.updatedAt ?? null }))
       .catch(() => live && setLoaded({ state: null, updatedAt: null }));
@@ -113,15 +146,17 @@ export function useSavedWork<T extends object>(key: string | null) {
     return undefined;
   }, [key, write]);
 
-  // leaving this piece of work (navigating away): write what is still pending
+  // leaving this piece of work (navigating away): write what is still pending. It stays pending
+  // until the server confirms it; if this last write fails, it is retried after the page is gone.
   useEffect(() => () => {
     clearTimeout(timer.current);
     if (key && pending.has(key)) {
       const state = pending.get(key);
-      pending.delete(key);
-      api(stateUrl(key), { state }, 'PUT').catch(() => { pending.set(key, state); });
+      api(stateUrl(key), { state }, 'PUT')
+        .then(() => { if (pending.get(key) === state) pending.delete(key); })
+        .catch(() => { orphans.add(key); orphanNote = note; note('error'); retryOrphans(); });
     }
-  }, [key]);
+  }, [key, note]);
 
   const clear = useCallback(() => {
     if (!key) return;

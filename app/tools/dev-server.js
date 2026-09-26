@@ -15,6 +15,10 @@ process.env.PORT = process.env.PORT || (newLearner ? '7702' : '7701');
 process.env.ACADEMY_DATA = process.env.ACADEMY_DATA || path.join(os.tmpdir(), newLearner ? 'academy-dev-new-learner' : 'academy-dev-data');
 process.env.ACADEMY_REQUIRE_TEST_DATA = '1';
 
+// The folder is taken where it really is (a junction or link is followed once, here), and the check
+// and everything after it use that same resolved path: a link cannot send the delete below anywhere
+// the check did not look.
+if (fs.existsSync(process.env.ACADEMY_DATA)) process.env.ACADEMY_DATA = fs.realpathSync.native(process.env.ACADEMY_DATA);
 // refuses (throws) if ACADEMY_DATA names the learner's real progress folder, before anything is touched
 assertTestDataDir(process.env.ACADEMY_DATA, 'the dev server');
 const dbFile = path.join(process.env.ACADEMY_DATA, 'academy.db');

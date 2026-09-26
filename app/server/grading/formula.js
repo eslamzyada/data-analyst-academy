@@ -169,10 +169,14 @@ export function orderRanges(formula) {
  * Harmless differences in how a formula was typed, removed before anything else looks at it:
  * invisible characters, a full-width =, and a doubled leading = ("==SUM(...)": the formula box
  * used to start with = already, and Excel habit adds another). Returns the text and what changed.
+ * Only outside quoted text (straight or curly quotes; an unclosed one runs to the end): inside quotes
+ * these characters are part of the answer. A non-breaking space in a search text makes the formula
+ * fail in Excel, and tidying it there turned that failing formula into the right one.
  */
 export function cleanFormulaInput(input) {
   const notes = [];
-  let f = String(input ?? '').replace(/[​-‍﻿]/g, '').replace(/ /g, ' ').replace(/＝/g, '=').trim();
+  const tidy = (s) => s.replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/\u00A0/g, ' ').replace(/\uFF1D/g, '=');
+  let f = String(input ?? '').split(/(["\u201C\u201D][^"\u201C\u201D]*["\u201C\u201D]?)/).map((part, i) => (i % 2 ? part : tidy(part))).join('').trim();
   if (/^=\s*=/.test(f)) { f = f.replace(/^=(\s*=)+/, '='); notes.push('extra-equals'); }
   // Excel closes brackets left open at the end (it offers the correction); so do we
   let open = 0;

@@ -183,6 +183,13 @@ function placementPassed(skillId) {
   return new Set(placement?.passed?.[skillId] || []);
 }
 
+/** Single topics credited by the placement check (Power BI's basics credit its introduction). */
+function placementCredited(skillId) {
+  const p = store.get('SELECT placement_json FROM profile WHERE id = 1');
+  const placement = p?.placement_json ? JSON.parse(p.placement_json) : null;
+  return new Set(placement?.credited?.[skillId] || []);
+}
+
 export function skillStage(skillId) {
   const skill = content.skillMap[skillId];
   const any = content.topics.some((t) => t.skill === skillId && (snapshot().byTopic[t.id] || []).length);
@@ -294,9 +301,11 @@ const ACTIVE_ORDER = ['excel', 'sql', 'pq', 'pbi'];
 export function nextTopicInSkill(skillId) {
   const list = content.topics.filter((t) => t.skill === skillId);
   const open = (t) => { const s = topicStatus(t); return s.unlocked && s.mastery < 80; };
-  // tiers passed in the placement check are confirmed through reviews, not re-taught first
+  // tiers (and single topics) credited by the placement check are confirmed through reviews, not
+  // re-taught first
   const passed = placementPassed(skillId);
-  return list.find((t) => !passed.has(t.level) && open(t)) || list.find(open) || null;
+  const credited = placementCredited(skillId);
+  return list.find((t) => !passed.has(t.level) && !credited.has(t.id) && open(t)) || list.find(open) || null;
 }
 
 function lastPracticed(skillId) {

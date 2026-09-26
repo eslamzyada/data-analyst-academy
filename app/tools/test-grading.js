@@ -19,6 +19,7 @@ const { gradeFormula, translateFormula, sameFormulaText, clearFormulaCache, orde
 const { sameSqlText, gradeSql } = await import('../server/grading/sql.js');
 const { dateMatches } = await import('../server/grading/excel.js');
 const { initSqlRunner, runSql } = await import('../server/sqlrunner.js');
+const { sqlHelp } = await import('../server/sqlhelp.js');
 const { OUTCOME, STATE, outcomeOf, isRecordable, taskState, quizState, projectState, lessonState } = await import('../shared/lifecycle.js');
 loadContent(path.join(ROOT, 'data'));
 initSqlRunner(path.join(ROOT, 'data', 'practice'));
@@ -237,6 +238,20 @@ section('formula matrix: learner mistakes vs app problems');
 
   const dbl = g('==SUBSTITUTE(A2, " kg", "")*1');
   ok(dbl.correct && /single "="/.test(dbl.notice || ''), 'a doubled "=" is read as one, and the learner is told so in a small tip', show(dbl));
+  // Quoted text is part of the answer, so tidying the typing must never touch it. A non-breaking or
+  // zero-width space in the search text makes the formula fail in Excel; cleaning it up used to
+  // turn exactly that formula into the right one (found by the Codex review).
+  const NBSP = ' ', ZWSP = '​';
+  for (const [label, f] of [
+    ['a non-breaking space', `=VALUE(SUBSTITUTE(A2,"${NBSP}kg",""))`],
+    ['a zero-width space', `=VALUE(SUBSTITUTE(A2," ${ZWSP}kg",""))`],
+    ['a non-breaking space between curly quotes', `=VALUE(SUBSTITUTE(A2,“${NBSP}kg”,""))`],
+  ]) {
+    const r = g(f);
+    ok(!r.correct && r.outcome === OUTCOME.INCORRECT, `${label} inside the quoted search text is kept, so the formula fails as it does in Excel (never CORRECT)`, show(r));
+  }
+  const outside = g(`${ZWSP}=VALUE(SUBSTITUTE(A2,${NBSP}" kg",""))`);
+  ok(outside.correct, 'invisible characters and non-breaking spaces outside quotes are still harmless', show(outside));
   const typo = g('=VALUE(SUBSITUTE(A2," kg",""))');
   ok(/SUBSITUTE/.test(typo.feedback) && /Did you mean SUBSTITUTE\?/.test(typo.feedback) && typo.noMistake, 'a misspelt function is named, with the likely one ("Did you mean SUBSTITUTE?")', typo.feedback);
   const quote = g('=VALUE(SUBSTITUTE(A2," kg,""))');
@@ -328,6 +343,31 @@ section('SQL grading');
   const slowGrade = await gradeSql(it, SLOW);
   ok(outcomeOf(slowGrade) === OUTCOME.INCORRECT && slowGrade.noMistake === true && /stopped/i.test(slowGrade.feedback || ''),
     'a stopped query is a checked answer (explained) but not logged as a concept mistake', JSON.stringify(slowGrade).slice(0, 160));
+
+  // A stopped query is explained by what it contains, with the real time limit (found by the Codex
+  // review: every stop was blamed on a JOIN without ON, and the message always said 8 seconds).
+  const secs = String(Number(process.env.ACADEMY_SQL_LIMIT_MS) / 1000);
+  ok(slow.limitMs === Number(process.env.ACADEMY_SQL_LIMIT_MS) && slow.error.includes(`${secs} seconds`) && !/\bJOIN\b|\bON condition/i.test(slow.error),
+    `a stopped query without a JOIN is not blamed on one, and the message gives the real limit (${secs} s)`, slow.error);
+  const cedar = { id: 'cedarline', title: 'Cedarline', tables: [{ name: 'orders', columns: ['order_id'] }, { name: 'customers', columns: ['customer_id'] }] };
+  const recursiveHelp = sqlHelp(slow.error, SLOW, cedar, { kind: 'timeout', limitMs: slow.limitMs });
+  ok(/recursive/i.test(recursiveHelp.message) && !/missing its ON/i.test(recursiveHelp.message) && recursiveHelp.message.includes(`${secs} seconds`),
+    'the help for a runaway WITH RECURSIVE talks about its stop condition, not a JOIN', recursiveHelp.message);
+  const crossJoin = 'SELECT COUNT(*) FROM orders o JOIN customers c JOIN orders o2';
+  ok(/missing its ON/i.test(sqlHelp('stopped', crossJoin, cedar, { kind: 'timeout', limitMs: 8000 }).message),
+    'the help for a JOIN without its ON condition still says so');
+
+  // Every query starts from the same connection settings: a PRAGMA in one query must not change the
+  // next one (found by the Codex review: case_sensitive_like changed an unrelated LIKE from 565 to 4
+  // rows, for every later query and check, until the app restarted).
+  const probe = "SELECT COUNT(*) FROM customers WHERE full_name LIKE 'a%'";
+  const pBefore = await runSql('cedarline', probe);
+  const pragma = await runSql('cedarline', 'PRAGMA case_sensitive_like=ON');
+  const pAfter = await runSql('cedarline', probe);
+  ok(pBefore.ok && pAfter.ok && pBefore.rows[0][0] > 0 && pAfter.rows[0][0] === pBefore.rows[0][0],
+    'a PRAGMA run by one query does not change the results of the next one', `${pBefore.rows?.[0]?.[0]} -> ${pAfter.rows?.[0]?.[0]} (pragma ok=${pragma.ok})`);
+  const info = await runSql('cedarline', 'PRAGMA table_info(customers)');
+  ok(info.ok && info.rows.some((r) => r.includes('full_name')), 'a PRAGMA that only reads (table_info) still works in the SQL Lab', JSON.stringify(info).slice(0, 160));
 }
 
 // ================================================================ LIFECYCLE RULES
