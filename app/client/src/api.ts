@@ -27,4 +27,3 @@ export function trackActivity(path: string, label: string) {
 
 export const SKILL_COLORS: Record<string, string> = { excel: '#15803d', sql: '#2563eb', pq: '#b45309', pbi: '#ca8a04', think: '#7c3aed' };
 export const SKILL_NAMES: Record<string, string> = { excel: 'Excel', sql: 'SQL', pq: 'Power Query', pbi: 'Power BI', think: 'Analyst Thinking' };
-export const STATUS_LABEL: Record<string, string> = { locked: 'Locked', new: 'Not started', placed: 'To confirm', learning: 'Learning', practicing: 'Practicing', good: 'Good', mastered: 'Mastered' };

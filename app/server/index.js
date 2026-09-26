@@ -116,11 +116,15 @@ function profile() {
   return { name: p.name, onboarded: !!p.onboarded, placement: p.placement_json ? JSON.parse(p.placement_json) : null, lastActivity: p.last_activity_json ? JSON.parse(p.last_activity_json) : null };
 }
 
+// Three different things, never under one name (see CLAUDE.md "Learner standing"):
+//   masteryStage  what the learner can do (the Mastery Layer's six stages) - the standing pages show
+//   tierStage     where the learner is in the curriculum (Beginner / Intermediate / Advanced)
+//   mastery (%)   how much of a topic is covered, with `status` - internal: unlocking, reviews, plans
 function topicCard(t) {
   const s = engine.topicStatus(t);
   const v = mastery.topicView(t.id);
   return { id: t.id, title: t.title, summary: t.summary, skill: t.skill, level: t.level, minutes: t.minutes, prereqs: (t.prereqs || []).map((p) => content.topicMap[p]?.title), ...s,
-    stage: v.stage, stageLabel: v.stageLabel };
+    masteryStage: v.stage, masteryStageLabel: v.stageLabel };
 }
 
 /** A topic's stage with its four kinds of evidence and what would move it up. */
@@ -138,8 +142,8 @@ function skillSummary(sk) {
   const mv = mastery.skillView(sk.id);
   return {
     id: sk.id, name: sk.name, blurb: sk.blurb, color: sk.color, levels: sk.levels,
-    masteryStage: mv.stage, masteryStageLabel: mv.stageLabel, masterySummary: mv.summary,
-    progress: engine.skillProgress(sk.id), stage: engine.skillStage(sk.id),
+    masteryStage: mv.stage, masteryStageLabel: mv.stageLabel, masteryMeaning: mv.meaning, masterySummary: mv.summary,
+    progress: engine.skillProgress(sk.id), tierStage: engine.skillStage(sk.id),
     topics: topics.length, mastered: topics.filter((t) => engine.topicStatus(t).status === 'mastered').length,
     next: next ? { id: next.id, title: next.title } : null,
   };
@@ -156,7 +160,8 @@ app.get('/api/home', wrap((req, res) => {
   const lvl = engine.currentLevel();
   const plan = store.get('SELECT plan_json, done_json FROM daily_plan WHERE day = ?', [new Date().toLocaleDateString('en-CA')]);
   res.json({
-    profile: p, level: lvl, overall: engine.overallProgress(),
+    // legacyLevel: the retired 1-7 levels (milestones replaced them on every page); no page reads it
+    profile: p, legacyLevel: lvl, overall: engine.overallProgress(),
     skills: content.skills.map(skillSummary),
     focus: { ...f, topic: topicCard(topic), skillName: content.skillMap[topic.skill].name },
     practice: practice ? clientItem(practice) : null,
@@ -335,7 +340,7 @@ app.post('/api/placement/next', wrap(async (req, res) => {
   if (!next) return res.json({ done: true, asked });
   res.json({
     done: false, number: Object.keys(req.body.answers || {}).length + 1,
-    area: next.area, areaName: AREA_NAME[next.area], stage: next.stage, stageWords: STAGE_WORDS[next.stage],
+    area: next.area, areaName: AREA_NAME[next.area], placementStage: next.stage, placementStageWords: STAGE_WORDS[next.stage],
     question: { ...clientItem(next.q), idkLabel: "I haven't learned this yet" },
     // the tools in order, with where the check is: done, now, still to come, or skipped
     areas: PLACEMENT_ORDER.map((id) => ({ area: id, name: AREA_NAME[id],
@@ -1272,13 +1277,14 @@ app.get('/api/progress', wrap((req, res) => {
   const days = store.all("SELECT substr(ts,1,10) AS d, COUNT(*) AS n FROM attempts WHERE source <> 'placement' GROUP BY 1 ORDER BY 1 DESC LIMIT 28");
   const next = engine.focus();
   res.json({
-    level: engine.currentLevel(), overall: engine.overallProgress(),
+    legacyLevel: engine.currentLevel(), overall: engine.overallProgress(),
     skills: content.skills.map((sk) => ({ ...skillSummary(sk), tiers: sk.levels.map((tier) => ({ tier, avg: Math.round(engine.tierAverage(sk.id, tier)) })) })),
-    strengths: engine.strengths(), weaknesses: engine.weaknesses(), mistakes: engine.openMistakes(12), recent: engine.recentMistakes(8),
+    strengths: engine.strengths().map((x) => { const v = mastery.topicView(x.topicId); return { ...x, masteryStage: v.stage, masteryStageLabel: v.stageLabel }; }),
+    weaknesses: engine.weaknesses(), mistakes: engine.openMistakes(12), recent: engine.recentMistakes(8),
     next: { ...next, title: content.topicMap[next.topicId]?.title },
     exams: store.all('SELECT exam_id, score, ts FROM exam_results ORDER BY ts DESC LIMIT 10').map((e) => ({ ...e, title: content.exams.find((x) => x.id === e.exam_id)?.title })),
     stats: { answered: attempts.n || 0, correct: attempts.c || 0, activeDays: days.length, days },
-    topics: content.topics.map((t) => ({ id: t.id, title: t.title, skill: t.skill, level: t.level, ...engine.topicStatus(t), stage: mastery.topicView(t.id).stage, stageLabel: mastery.topicView(t.id).stageLabel })),
+    topics: content.topics.map((t) => { const v = mastery.topicView(t.id); return { id: t.id, title: t.title, skill: t.skill, level: t.level, ...engine.topicStatus(t), masteryStage: v.stage, masteryStageLabel: v.stageLabel }; }),
     mastery: mastery.masterySummary(),
     milestones: milestones(),
     glance: progressGlance(),

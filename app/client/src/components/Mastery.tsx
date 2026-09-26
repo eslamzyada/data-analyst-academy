@@ -17,10 +17,15 @@ export function StageLadder({ stage, compact = false }: { stage: string; compact
   );
 }
 
+/**
+ * The learner's standing: the Mastery stage, the only word any page uses to say how good the learner
+ * is at something. `data-standing` marks it (the browser tests check that no other badge competes).
+ * Curriculum position (Beginner/Intermediate/Advanced) and "% covered" are shown with their own labels.
+ */
 export function StageTag({ stage }: { stage: string }) {
   const at = STAGES.indexOf(stage);
   const cls = at >= 4 ? 'green' : at >= 3 ? 'blue' : at >= 1 ? 'amber' : '';
-  return <span className={`badge ${cls}`}>{STAGE_LABEL[stage] || stage}</span>;
+  return <span className={`badge ${cls}`} data-standing="mastery">{STAGE_LABEL[stage] || stage}</span>;
 }
 
 const MARK: Record<string, { sym: string; cls: string; word: string }> = {
