@@ -105,6 +105,26 @@ try {
   check('PLACEMENT: the starting point is described in plain words for every tool', ['excel', 'sql', 'pq', 'pbi', 'think'].every((k) => typeof placed.roadmapText[k] === 'string' && placed.roadmapText[k].length > 20) && /What Power BI is/.test(placed.roadmapText.pbi), JSON.stringify(placed.roadmapText));
   check('PLACEMENT: "I haven\'t learned this yet" answers are not recorded as wrong answers', placed.results.length === Object.values(plAnswers).filter((a) => a !== 'idk').length && placed.results.every((r) => plAnswers[r.id] !== 'idk'), JSON.stringify(placed.results.length));
   check('placement suggests a start topic', !!placed.startTopic, JSON.stringify(placed));
+  {
+  // counted in this test's own throw-away progress file (the progress page leaves placement out)
+  const SQLJS = await (await import('sql.js')).default();
+  const dbCount = (q) => { const d = new SQLJS.Database(fs.readFileSync(path.join(tmp, 'academy.db'))); try { return d.exec(q)[0]?.values[0][0] ?? 0; } finally { d.close(); } };
+  const plRows = () => dbCount("SELECT COUNT(*) FROM attempts WHERE source = 'placement'");
+  // Handed in again (the page retries when a reply was lost): nothing more is recorded, and the
+  // first result stands (Codex review: every submission credited and unlocked again).
+  const rowsOnce = plRows();
+  const placedAgain = await api('POST', '/api/placement', { selfReport, answers: plAnswers });
+  check('PLACEMENT: handing the placement in again records nothing more and returns the first result', placedAgain.status === 200 && rowsOnce > 0 && plRows() === rowsOnce && placedAgain.json.at === placed.at,
+    `${rowsOnce} -> ${plRows()} rows; at ${placed.at} / ${placedAgain.json.at}`);
+  // Placement questions are answered only inside the placement check: through the ordinary item
+  // route, "I haven't learned this yet" became a recorded wrong answer (Codex review).
+  const mistakesBefore = dbCount('SELECT COUNT(*) FROM mistakes');
+  const viaItemIdk = await api('POST', '/api/items/pl2-xl-1/submit', { answer: 'idk' });
+  const viaItemAnswer = await api('POST', '/api/items/pl2-xl-1/submit', { answer: 0 });
+  check('PLACEMENT: its questions cannot be answered through the ordinary item route, so nothing is recorded there',
+    viaItemIdk.status >= 400 && viaItemAnswer.status >= 400 && plRows() === rowsOnce && dbCount('SELECT COUNT(*) FROM mistakes') === mistakesBefore,
+    `${viaItemIdk.status}/${viaItemAnswer.status}; placement rows ${rowsOnce} -> ${plRows()}`);
+  }
 
   home = (await api('GET', '/api/home')).json;
   check('home after placement: onboarded + named', home.profile.onboarded && home.profile.name === 'Islam');
@@ -538,9 +558,11 @@ try {
     const submit = async (answer) => (await api('POST', '/api/items/xl-basics-p2/submit', { answer, source: 'practice', ctx: 'task' })).json;
     const c0 = await count();
     const dbl = await submit('=' + p2Model);
-    check('FORMULA: a doubled "=" (==...) is read as one: CORRECT, recorded as a right answer, with a small tip', dbl.outcome === 'CORRECT' && dbl.recorded && /single "="/.test(dbl.notice || ''), JSON.stringify(dbl).slice(0, 240));
+    // Excel rejects "==": a checked wrong answer, explained, not a concept mistake (owner's decision
+    // after the Codex review; it used to be read as one "=" and marked right)
+    check('FORMULA: a doubled "=" (==...) is marked wrong as Excel would: INCORRECT (syntax), recorded, explained', dbl.outcome === 'INCORRECT' && dbl.reason === 'syntax' && dbl.recorded && dbl.noMistake === true && /single "="/.test(dbl.feedback || ''), JSON.stringify(dbl).slice(0, 240));
     const saved = (await api('GET', '/api/state/item:xl-basics-p2')).json.state;
-    check('FORMULA: the result kept for a refresh remembers why (reason) and the tip', saved && saved.result && saved.result.reason === 'correct' && /single "="/.test(saved.result.notice || ''), JSON.stringify(saved && saved.result).slice(0, 200));
+    check('FORMULA: the result kept for a refresh remembers why (reason)', saved && saved.result && saved.result.reason === 'syntax' && /single "="/.test(saved.result.feedback || ''), JSON.stringify(saved && saved.result).slice(0, 200));
     const syn = await submit('=B2/($B$7');
     const syn2 = await submit('=B2*/C2');
     check('FORMULA: a mistake Excel would reject -> INCORRECT (reason syntax), recorded, explained without parser jargon', syn2.outcome === 'INCORRECT' && syn2.reason === 'syntax' && syn2.recorded && !/Parsing|Token/.test(syn2.feedback), JSON.stringify(syn2).slice(0, 240));
@@ -740,6 +762,29 @@ try {
     check('SAFETY: the dev server checks before it empties anything', dev.status !== 0 && /refused/.test(dev.stderr) && !fs.existsSync(outside), `${dev.status} ${dev.stderr.slice(0, 200)}`);
     const fixture = spawnSync(process.execPath, ['tools/fixture.js', outside, '--force'], { cwd: APP, encoding: 'utf8', timeout: 20000 });
     check('SAFETY: the fixture builder refuses a folder outside the temporary folder', fixture.status !== 0 && /refused/.test(fixture.stderr) && !fs.existsSync(outside), `${fixture.status} ${fixture.stderr.slice(0, 200)}`);
+    // A folder link inside the temporary folder (a Windows junction; a symlink elsewhere) is judged
+    // by where it leads, and nothing behind it is deleted (asked by the Codex review). The folder it
+    // leads to holds a decoy progress file that must survive.
+    // Both folders are new and unique to this run (mkdtemp), so the test never touches, and never
+    // removes, anything it did not create (asked by the Codex test review).
+    const target = fs.mkdtempSync(path.join(APP, 'smoke-junction-target-'));
+    const linkHome = fs.mkdtempSync(path.join(os.tmpdir(), 'academy-smoke-link-'));
+    const link = path.join(linkHome, 'data');
+    fs.writeFileSync(path.join(target, 'academy.db'), 'decoy');
+    try {
+      fs.symlinkSync(target, link, 'junction');
+      const viaLink = spawnSync(process.execPath, ['tools/dev-server.js', '--new-learner'], { cwd: APP, env: envFor(link), encoding: 'utf8', timeout: 20000 });
+      check('SAFETY: a folder link in the temporary folder that leads outside it is refused, and the file behind it survives',
+        viaLink.status !== 0 && /refused/.test(viaLink.stderr) && fs.readFileSync(path.join(target, 'academy.db'), 'utf8') === 'decoy', `${viaLink.status} ${viaLink.stderr.slice(0, 200)}`);
+      const srvLink = spawnSync(process.execPath, ['server/index.js'], { cwd: APP, env: envFor(link), encoding: 'utf8', timeout: 20000 });
+      check('SAFETY: ...and a test server given that link refuses it too (exit 2)', srvLink.status === 2 && /temporary folder/.test(srvLink.stderr) && fs.readFileSync(path.join(target, 'academy.db'), 'utf8') === 'decoy', `${srvLink.status} ${srvLink.stderr.slice(0, 200)}`);
+    } finally {
+      // remove the link itself first (rmdir never follows a junction into its target), then the two
+      // folders this run made: the target holds only the decoy it was given
+      try { fs.rmdirSync(link); } catch { try { fs.unlinkSync(link); } catch { /* not created */ } }
+      try { fs.rmdirSync(linkHome); } catch { /* not empty: the link was not removed, so leave it */ }
+      try { fs.unlinkSync(path.join(target, 'academy.db')); fs.rmdirSync(target); } catch { /* keep anything unexpected */ }
+    }
     // ================================================================ ERRORS: always plain JSON, never an HTML page
     const bad = await fetch(`${BASE}/api/quiz-sessions`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: 'topic:no-such-topic', n: 6 }) });
     const badText = await bad.text();
@@ -757,6 +802,36 @@ try {
     check('ERRORS: the Academy page is still answered by the app, not by the API error handling', (page.status === 200 && pageText.includes('<div id="root">')) || (page.status === 503 && /has not been built yet/.test(pageText)), `${page.status} ${pageText.slice(0, 120)}`);
     // if a check above failed, the refused folder may exist after all: remove exactly that test folder
     if (fs.existsSync(outside) && path.basename(outside) === 'no-such-test-folder') fs.rmSync(outside, { recursive: true, force: true });
+  }
+  // ================================================================ PLACEMENT: Power BI basics passed (last: it resets this test learner)
+  // The roadmap promises that the credited introduction leads on to getting data in; the path used
+  // to recommend the introduction again, with getting data in still locked (Codex review).
+  {
+    await api('POST', '/api/reset', { confirm: 'RESET' });
+    await api('POST', '/api/profile', { name: 'Islam' });
+    const pbiReport = { excel: 'never', sql: 'never', pq: 'never', pbi: 'little' };
+    const pbiAnswers = {};
+    for (let i = 0; i < 30; i++) {
+      const nx = (await api('POST', '/api/placement/next', { selfReport: pbiReport, answers: pbiAnswers })).json;
+      if (nx.done) break;
+      pbiAnswers[nx.question.id] = nx.area === 'pbi' ? shown(nx.question.id, content.items[nx.question.id].answer) : 'idk';
+    }
+    // handed in twice at the same moment (a double click; the route waits on grading in between):
+    // still recorded once (Codex test review: a sequential retry could not show this race)
+    const [firstIn, secondIn] = await Promise.all([1, 2].map(() => api('POST', '/api/placement', { selfReport: pbiReport, answers: pbiAnswers })));
+    const pbiPlaced = firstIn.json;
+    const SQLJS = await (await import('sql.js')).default();
+    const d = new SQLJS.Database(fs.readFileSync(path.join(tmp, 'academy.db')));
+    const plRows = d.exec("SELECT COUNT(*) FROM attempts WHERE source = 'placement'")[0].values[0][0];
+    d.close();
+    check('PLACEMENT: two hand-ins at the same moment are recorded once (one answer each, one credited topic)',
+      firstIn.status === 200 && secondIn.status === 200 && secondIn.json.at === pbiPlaced.at && plRows === pbiPlaced.results.length + 1,
+      `rows ${plRows}, want ${pbiPlaced.results.length + 1}; at ${pbiPlaced.at} / ${secondIn.json.at}`);
+    const pbiSkill = (await api('GET', '/api/skills/pbi')).json;
+    const importCard = pbiSkill.path.find((t) => t.id === 'pbi-import');
+    check('PLACEMENT: passing the Power BI basics leads on to getting data in, as the roadmap says',
+      /getting data in/.test(pbiPlaced.roadmapText?.pbi || '') && pbiSkill.recommended === 'pbi-import' && importCard?.unlocked === true,
+      `roadmap: ${pbiPlaced.roadmapText?.pbi} | recommended: ${pbiSkill.recommended} | pbi-import unlocked: ${importCard?.unlocked}`);
   }
 } catch (e) {
   check('no exceptions', false, e.stack);

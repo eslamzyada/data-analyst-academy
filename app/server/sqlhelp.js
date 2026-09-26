@@ -65,7 +65,20 @@ export function sqlHelp(error, sql, db, extra = {}) {
     return base({ kind: 'unavailable', title: 'The practice database is unavailable', message: `${db.title} could not be opened. This is a problem with the app's practice files, not with your query: your query is kept. Try again in a moment, or restart the Academy.`, example: null });
   }
   if (extra.kind === 'timeout') {
-    return base({ kind: 'timeout', title: 'Your query took too long and was stopped', message: 'It ran for more than 8 seconds. This usually means a JOIN is missing its ON condition, so every row was matched with every other row.', tables, example: 'SELECT o.order_id, c.full_name\nFROM orders o\nJOIN customers c ON c.customer_id = o.customer_id\nLIMIT 10;' });
+    // explained by what the query contains: only the time was measured
+    const ran = `It ran for more than ${(extra.limitMs || 8000) / 1000} seconds.`;
+    const flat = String(sql || '').replace(/\s+/g, ' ');
+    const joins = (flat.match(/\bJOIN\b/gi) || []).length;
+    const joinConditions = (flat.match(/\bJOIN\b[^;]*?\b(?:ON|USING)\b/gi) || []).length;
+    const commaJoin = /\bFROM\s+[A-Za-z_][\w.]*(?:\s+(?:AS\s+)?[A-Za-z_]\w*)?\s*,/i.test(flat) && !/\bWHERE\b/i.test(flat);
+    const joinExample = 'SELECT o.order_id, c.full_name\nFROM orders o\nJOIN customers c ON c.customer_id = o.customer_id\nLIMIT 10;';
+    if (/NATURAL\s+JOIN/i.test(flat) || (joins && joinConditions < joins) || commaJoin) {
+      return base({ kind: 'timeout', title: 'Your query took too long and was stopped', message: `${ran} A JOIN in it is missing its ON condition, so every row was matched with every other row. Say how the tables connect.`, tables, example: joinExample });
+    }
+    if (/\bWITH\s+RECURSIVE\b/i.test(flat)) {
+      return base({ kind: 'timeout', title: 'Your query took too long and was stopped', message: `${ran} Its WITH RECURSIVE part never reaches a stopping point: add a condition that ends it, such as WHERE x < 100 in the recursive step.`, tables, example: 'WITH RECURSIVE n(x) AS (\n  SELECT 1\n  UNION ALL\n  SELECT x + 1 FROM n WHERE x < 100\n)\nSELECT x FROM n;' });
+    }
+    return base({ kind: 'timeout', title: 'Your query took too long and was stopped', message: `${ran} Queries on these practice databases normally finish in well under a second, so something in this one repeats far too often. Check that every JOIN says how the tables connect (ON), and try it first with LIMIT 10.`, tables, example: joinExample });
   }
 
   const upper = String(sql || '').trim().replace(/\s+/g, ' ').toUpperCase();

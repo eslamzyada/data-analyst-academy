@@ -122,6 +122,35 @@ const scenarios = {
     check('task: the next-step button leads somewhere new', (await b.evaluate('location.hash')) !== before, await b.evaluate('location.hash'));
   },
 
+  // ------------------------------------------------------------ a save that fails while leaving a task
+  // The app is away (a restart) while the learner types and then leaves the task: the last save on
+  // the way out fails too. Once the app is back, that draft must still reach it, and the page must
+  // not keep saying it could not save (found by the Codex review: the draft used to wait, unsent,
+  // until the tab was closed, and coming back showed the older copy).
+  async savefail(b) {
+    const url = `${BASE}/#/task/xl-basics-p1`;
+    const box = '.formula-bar input';
+    await b.goto(url);
+    await b.waitFor(`!!document.querySelector('.formula-bar input')`, { label: 'formula bar' });
+    await b.type(box, '=C2');
+    await waitSaved(b);
+    await stopServer();
+    await b.type(box, '*2');
+    await sleep(1500); // the debounced save tries and fails
+    check('saving: while the app is away, the page says it could not save yet', /couldn't save/i.test(await b.evaluate(`document.querySelector('.saveflag')?.textContent || ''`)));
+    await b.route('#/practice'); // leaving: the last save on the way out fails as well
+    await sleep(800);
+    startServer();
+    check('app comes back', await waitUp(), serverOut.slice(-400));
+    await sleep(4000); // time enough for a retry
+    const saved = await api('GET', '/api/state/item%3Axl-basics-p1');
+    check('saving: the draft typed while the app was away reaches it once it is back', JSON.stringify(saved.state || {}).includes('=C2*2'), JSON.stringify(saved).slice(0, 200));
+    check('saving: the page no longer says it could not save', !/couldn't save/i.test(await b.evaluate(`document.querySelector('.saveflag')?.textContent || ''`)), await b.evaluate(`document.querySelector('.saveflag')?.textContent || ''`));
+    await b.route('#/task/xl-basics-p1');
+    await b.waitFor(`document.querySelector('.formula-bar input')?.value === '=C2*2'`, { label: 'the newer draft', timeout: 6000 }).catch(() => {});
+    check('saving: coming back to the task shows the newer draft', (await inputValue(b, box)) === '=C2*2', await inputValue(b, box));
+  },
+
   // ------------------------------------------------------------ an incorrect answer is not a dead end
   // ------------------------------------------------------------ formula grading: learner mistakes vs app problems
   async formula(b) {

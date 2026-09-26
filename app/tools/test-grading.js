@@ -19,6 +19,7 @@ const { gradeFormula, translateFormula, sameFormulaText, clearFormulaCache, orde
 const { sameSqlText, gradeSql } = await import('../server/grading/sql.js');
 const { dateMatches } = await import('../server/grading/excel.js');
 const { initSqlRunner, runSql } = await import('../server/sqlrunner.js');
+const { sqlHelp } = await import('../server/sqlhelp.js');
 const { OUTCOME, STATE, outcomeOf, isRecordable, taskState, quizState, projectState, lessonState } = await import('../shared/lifecycle.js');
 loadContent(path.join(ROOT, 'data'));
 initSqlRunner(path.join(ROOT, 'data', 'practice'));
@@ -223,7 +224,7 @@ section('formula matrix: learner mistakes vs app problems');
     ['7. a wrong formula', '=VALUE(SUBSTITUTE(A2," kg",""))*2', OUTCOME.INCORRECT, 'wrong-result'],
     ['8. an empty answer', '', OUTCOME.NOT_EVALUABLE, 'empty'],
     ['9. extra whitespace around it', '   =VALUE(SUBSTITUTE(A2," kg",""))   ', OUTCOME.CORRECT, 'correct'],
-    ['10. a duplicated leading "="', '==SUBSTITUTE(A2, " kg", "")*1', OUTCOME.CORRECT, 'correct'],
+    ['10. a duplicated leading "=" (Excel rejects it)', '==SUBSTITUTE(A2, " kg", "")*1', OUTCOME.INCORRECT, 'syntax'],
     ['14. a real Excel function the calculator lacks', '=NUMBERVALUE(SUBSTITUTE(A2," kg",""))', OUTCOME.NOT_EVALUABLE, 'unsupported-function'],
     ['15. a wrong result: the digits come back as text', '=SUBSTITUTE(A2," kg","")', OUTCOME.INCORRECT, 'text-not-number'],
     ['16. the right result by another valid method', '=LEFT(A2,FIND(" ",A2)-1)*1', OUTCOME.CORRECT, 'correct'],
@@ -236,7 +237,24 @@ section('formula matrix: learner mistakes vs app problems');
   for (const [label, f, outcome, reason] of cases) { const r = g(f); ok(is(r, outcome, reason), `matrix ${label} -> ${outcome} (${reason})`, show(r)); }
 
   const dbl = g('==SUBSTITUTE(A2, " kg", "")*1');
-  ok(dbl.correct && /single "="/.test(dbl.notice || ''), 'a doubled "=" is read as one, and the learner is told so in a small tip', show(dbl));
+  // Owner's decision after the Codex review (Sept 2026): the box no longer starts with "=", so a
+  // typed "==" is the learner's own, and Excel rejects it. It is a checked wrong answer, explained,
+  // not logged as a concept mistake. (It used to be read as one "=" and marked right.)
+  ok(!dbl.correct && dbl.reason === 'syntax' && dbl.noMistake === true && /single "="/.test(dbl.feedback || ''), 'a doubled "=" is marked wrong as Excel would, with a plain explanation (not a concept mistake)', show(dbl));
+  // Quoted text is part of the answer, so tidying the typing must never touch it. A non-breaking or
+  // zero-width space in the search text makes the formula fail in Excel; cleaning it up used to
+  // turn exactly that formula into the right one (found by the Codex review).
+  const NBSP = ' ', ZWSP = '​';
+  for (const [label, f] of [
+    ['a non-breaking space', `=VALUE(SUBSTITUTE(A2,"${NBSP}kg",""))`],
+    ['a zero-width space', `=VALUE(SUBSTITUTE(A2," ${ZWSP}kg",""))`],
+    ['a non-breaking space between curly quotes', `=VALUE(SUBSTITUTE(A2,“${NBSP}kg”,""))`],
+  ]) {
+    const r = g(f);
+    ok(!r.correct && r.outcome === OUTCOME.INCORRECT, `${label} inside the quoted search text is kept, so the formula fails as it does in Excel (never CORRECT)`, show(r));
+  }
+  const outside = g(`${ZWSP}=VALUE(SUBSTITUTE(A2,${NBSP}" kg",""))`);
+  ok(outside.correct, 'invisible characters and non-breaking spaces outside quotes are still harmless', show(outside));
   const typo = g('=VALUE(SUBSITUTE(A2," kg",""))');
   ok(/SUBSITUTE/.test(typo.feedback) && /Did you mean SUBSTITUTE\?/.test(typo.feedback) && typo.noMistake, 'a misspelt function is named, with the likely one ("Did you mean SUBSTITUTE?")', typo.feedback);
   const quote = g('=VALUE(SUBSTITUTE(A2," kg,""))');
@@ -277,10 +295,12 @@ section('formula matrix: learner mistakes vs app problems');
 
   // ---- the same holds for every formula in the academy
   const outsideQuotes = (f, fn) => f.split(/("(?:[^"]|"")*")/).map((p, i) => (i % 2 ? p : fn(p))).join('');
-  const harmless = (a) => [`=${a}`, outsideQuotes(a, (p) => p.toLowerCase()), `  ${a}  `, a.replace(/^=/, '= '), outsideQuotes(a, (p) => p.replace(/,/g, ', '))];
+  const harmless = (a) => [outsideQuotes(a, (p) => p.toLowerCase()), `  ${a}  `, a.replace(/^=/, '= '), outsideQuotes(a, (p) => p.replace(/,/g, ', '))];
   const broken = [];
   for (const it of items) for (const v of harmless(it.answer)) { const r = gradeFormula(it, v); if (!r.correct) broken.push(`${it.id}: ${v} -> ${r.reason}`); }
-  ok(broken.length === 0, `all ${items.length} formula tasks: the model answer typed with a doubled "=", in lower case, with extra spaces still counts as right (${items.length * 5} checks)`, broken.slice(0, 5).join(' | '));
+  ok(broken.length === 0, `all ${items.length} formula tasks: the model answer typed in lower case or with extra spaces still counts as right (${items.length * 4} checks)`, broken.slice(0, 5).join(' | '));
+  const doubled = items.filter((it) => { const r = gradeFormula(it, `=${it.answer}`); return r.correct || r.reason !== 'syntax'; });
+  ok(doubled.length === 0, `all ${items.length} formula tasks: the model answer typed with a doubled "=" is marked wrong as Excel would (syntax)`, doubled.slice(0, 5).map((it) => it.id).join(' | '));
   const alarms = items.flatMap((it) => [it.answer, ...(it.accept || [])]).filter((f) => syntaxProblem(f));
   ok(alarms.length === 0, 'the syntax checker finds nothing wrong in any model or accepted answer (it can only blame real mistakes)', alarms.slice(0, 3).join(' | '));
   const validTricky = ['=-A2', '=A2*-1', '=A2^-2', '=A2%', '=(A2)', '=SUM(A2:A5,)', '=IF(A2>=5,"x","")', '=A2<>B2', '=A2&" "&B2', '={1,2,3}', '={1,-2;3,4}', '=SUM(A2 A3)',
@@ -328,6 +348,38 @@ section('SQL grading');
   const slowGrade = await gradeSql(it, SLOW);
   ok(outcomeOf(slowGrade) === OUTCOME.INCORRECT && slowGrade.noMistake === true && /stopped/i.test(slowGrade.feedback || ''),
     'a stopped query is a checked answer (explained) but not logged as a concept mistake', JSON.stringify(slowGrade).slice(0, 160));
+
+  // A stopped query is explained by what it contains, with the real time limit (found by the Codex
+  // review: every stop was blamed on a JOIN without ON, and the message always said 8 seconds).
+  const secs = String(Number(process.env.ACADEMY_SQL_LIMIT_MS) / 1000);
+  ok(slow.limitMs === Number(process.env.ACADEMY_SQL_LIMIT_MS) && slow.error.includes(`${secs} seconds`) && !/\bJOIN\b|\bON condition/i.test(slow.error),
+    `a stopped query without a JOIN is not blamed on one, and the message gives the real limit (${secs} s)`, slow.error);
+  const cedar = { id: 'cedarline', title: 'Cedarline', tables: [{ name: 'orders', columns: ['order_id'] }, { name: 'customers', columns: ['customer_id'] }] };
+  const recursiveHelp = sqlHelp(slow.error, SLOW, cedar, { kind: 'timeout', limitMs: slow.limitMs });
+  ok(/recursive/i.test(recursiveHelp.message) && !/missing its ON/i.test(recursiveHelp.message) && recursiveHelp.message.includes(`${secs} seconds`),
+    'the help for a runaway WITH RECURSIVE talks about its stop condition, not a JOIN', recursiveHelp.message);
+  const crossJoin = 'SELECT COUNT(*) FROM orders o JOIN customers c JOIN orders o2';
+  ok(/missing its ON/i.test(sqlHelp('stopped', crossJoin, cedar, { kind: 'timeout', limitMs: 8000 }).message),
+    'the help for a JOIN without its ON condition still says so');
+
+  // Every query starts from the same connection settings: a PRAGMA in one query must not change the
+  // next one (found by the Codex review: case_sensitive_like changed an unrelated LIKE from 565 to 4
+  // rows, for every later query and check, until the app restarted).
+  const probe = "SELECT COUNT(*) FROM customers WHERE full_name LIKE 'a%'";
+  // first: on one plain connection this PRAGMA really changes the probe, so "unchanged" below means
+  // isolation worked, not that the PRAGMA did nothing (asked by the Codex test review)
+  const SQLJS = await (await import('sql.js')).default();
+  const plain = new SQLJS.Database(fs.readFileSync(path.join(ROOT, 'data', 'practice', 'cedarline.db')));
+  const onOne = [plain.exec(probe)[0].values[0][0], (plain.exec('PRAGMA case_sensitive_like=ON'), plain.exec(probe)[0].values[0][0])];
+  plain.close();
+  ok(onOne[0] > 0 && onOne[1] !== onOne[0], `on a single connection the PRAGMA changes the probe (${onOne[0]} -> ${onOne[1]} rows)`, JSON.stringify(onOne));
+  const pBefore = await runSql('cedarline', probe);
+  const pragma = await runSql('cedarline', 'PRAGMA case_sensitive_like=ON');
+  const pAfter = await runSql('cedarline', probe);
+  ok(pragma.ok && pBefore.ok && pAfter.ok && pBefore.rows[0][0] === onOne[0] && pAfter.rows[0][0] === pBefore.rows[0][0],
+    'a PRAGMA run by one query (accepted) does not change the results of the next one', `${pBefore.rows?.[0]?.[0]} -> ${pAfter.rows?.[0]?.[0]} (pragma ok=${pragma.ok})`);
+  const info = await runSql('cedarline', 'PRAGMA table_info(customers)');
+  ok(info.ok && info.rows.some((r) => r.includes('full_name')), 'a PRAGMA that only reads (table_info) still works in the SQL Lab', JSON.stringify(info).slice(0, 160));
 }
 
 // ================================================================ LIFECYCLE RULES

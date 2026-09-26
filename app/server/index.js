@@ -344,6 +344,14 @@ app.post('/api/placement/next', wrap(async (req, res) => {
 }));
 
 app.post('/api/placement', wrap(async (req, res) => {
+  // Recorded once. Handed in again (the page retries when a reply was lost), it changes nothing and
+  // the first result stands: every submission used to credit and unlock again.
+  const earlier = store.get('SELECT placement_json FROM profile WHERE id = 1')?.placement_json;
+  if (earlier) {
+    const first = JSON.parse(earlier);
+    const start = first.startSkill ? engine.nextTopicInSkill(first.startSkill) : null;
+    return res.json({ ...first, startTopic: start ? { id: start.id, title: start.title, skill: content.skillMap[first.startSkill].name } : null });
+  }
   const selfReport = req.body.selfReport || {};
   const answers = req.body.answers || {};
   const { areas } = await placementPlan(selfReport, answers, { finish: true });
@@ -359,6 +367,7 @@ app.post('/api/placement', wrap(async (req, res) => {
   const roadmap = {};
   const roadmapText = {};
   const passed = {};
+  const creditedTopics = {};
   for (const a of Object.values(areas)) {
     const r = roadmapOf(a);
     roadmap[a.area] = r.start;
@@ -373,12 +382,20 @@ app.post('/api/placement', wrap(async (req, res) => {
       engine.recordAttempt({ itemId: `placement:${t.id}`, topicId: t.id, skillId: a.area, source: 'placement', rawScore: 1, noMistake: true });
       engine.unlockTopic(t.id);
     }
+    // Power BI's basics credit one topic, not a tier: it is confirmed by reviews like a passed tier,
+    // and the path goes on from the topic after it ("continues with getting data in")
+    if (a.area === 'pbi' && credited.length) {
+      creditedTopics.pbi = credited.map((t) => t.id);
+      const pbiPath = content.topics.filter((t) => t.skill === 'pbi');
+      const after = pbiPath[pbiPath.findIndex((t) => t.id === credited[credited.length - 1].id) + 1];
+      if (after) engine.unlockTopic(after.id);
+    }
     const tiers = ['Beginner', 'Intermediate', 'Advanced'];
     const last = passed[a.area][passed[a.area].length - 1];
     if (last) for (const t of content.topics.filter((x) => x.skill === a.area && x.level === tiers[tiers.indexOf(last) + 1])) engine.unlockTopic(t.id);
   }
   // credited topics come back as short review questions over the next days
-  engine.schedulePlacementReviews(content.topics.filter((t) => (passed[t.skill] || []).includes(t.level)).map((t) => t.id));
+  engine.schedulePlacementReviews(content.topics.filter((t) => (passed[t.skill] || []).includes(t.level) || (creditedTopics[t.skill] || []).includes(t.id)).map((t) => t.id));
   const score = (area) => {
     const mine = results.filter((r) => placementItem(r.id).area === area);
     return mine.length ? mine.filter((r) => r.correct).length / mine.length : 0;
@@ -387,7 +404,7 @@ app.post('/api/placement', wrap(async (req, res) => {
   // otherwise with the weakest of the three
   const core = ['excel', 'sql', 'pq'];
   const startSkill = core.find((a) => !passed[a].includes('Beginner')) || core.slice().sort((a, b) => score(a) - score(b))[0];
-  const placement = { at: nowIso(), version: 2, selfReport, roadmap, roadmapText, passed, startSkill,
+  const placement = { at: nowIso(), version: 2, selfReport, roadmap, roadmapText, passed, credited: creditedTopics, startSkill,
     scores: Object.fromEntries(PLACEMENT_ORDER.map((a) => [a, score(a)])), results };
   store.run('UPDATE profile SET onboarded = 1, placement_json = ? WHERE id = 1', [JSON.stringify(placement)]);
   const start = engine.nextTopicInSkill(startSkill);
@@ -618,6 +635,9 @@ function taskFollowUp(it, body) {
 app.post('/api/items/:id/submit', wrap(async (req, res) => {
   const it = getItem(req.params.id);
   if (!it) return res.status(404).json({ error: 'Unknown item' });
+  // placement questions are answered inside the placement check only, where "I haven't learned this
+  // yet" is never recorded; here it would have become a wrong answer
+  if (placementItem(it.id)) return res.status(409).json({ error: 'This question belongs to the placement check and is answered there.' });
   const body = req.body || {};
   const inSession = body.session !== undefined && body.session !== null;
   // a question inside a quiz attempt: the attempt is the record, and it must accept the answer
@@ -1058,7 +1078,7 @@ app.post('/api/sql/run', wrap(async (req, res) => {
     const { explainSqlError } = await import('./grading/sql.js');
     const kind = r.timeout ? 'timeout' : r.fault ? 'unavailable' : r.empty ? 'empty' : r.several ? 'several' : null;
     const schema = kind === 'unavailable' ? { id: db, title: content.databaseMap[db].title, tables: [] } : await schemaOf(db);
-    return res.json({ ...r, error: explainSqlError(r.error), help: sqlHelp(r.error, sql, schema, { kind, dialect }) });
+    return res.json({ ...r, error: explainSqlError(r.error), help: sqlHelp(r.error, sql, schema, { kind, dialect, limitMs: r.limitMs }) });
   }
   res.json(r);
 }));

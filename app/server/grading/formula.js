@@ -167,12 +167,17 @@ export function orderRanges(formula) {
 
 /**
  * Harmless differences in how a formula was typed, removed before anything else looks at it:
- * invisible characters, a full-width =, and a doubled leading = ("==SUM(...)": the formula box
- * used to start with = already, and Excel habit adds another). Returns the text and what changed.
+ * invisible characters and a full-width =. A doubled leading = ("==SUM(...)") is collapsed for the
+ * helpers that read the text, and noted as `extra-equals`: gradeFormula marks it wrong, as Excel
+ * does. Returns the text and what changed.
+ * Only outside quoted text (straight or curly quotes; an unclosed one runs to the end): inside quotes
+ * these characters are part of the answer. A non-breaking space in a search text makes the formula
+ * fail in Excel, and tidying it there turned that failing formula into the right one.
  */
 export function cleanFormulaInput(input) {
   const notes = [];
-  let f = String(input ?? '').replace(/[​-‍﻿]/g, '').replace(/ /g, ' ').replace(/＝/g, '=').trim();
+  const tidy = (s) => s.replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/\u00A0/g, ' ').replace(/\uFF1D/g, '=');
+  let f = String(input ?? '').split(/(["\u201C\u201D][^"\u201C\u201D]*["\u201C\u201D]?)/).map((part, i) => (i % 2 ? part : tidy(part))).join('').trim();
   if (/^=\s*=/.test(f)) { f = f.replace(/^=(\s*=)+/, '='); notes.push('extra-equals'); }
   // Excel closes brackets left open at the end (it offers the correction); so do we
   let open = 0;
@@ -498,8 +503,14 @@ function notChecked(reason, feedback, extra = {}) {
  */
 export function gradeFormula(item, formula) {
   const { text: input, notes } = cleanFormulaInput(formula);
+  // Excel rejects a formula that starts with "==". It was once read as one "=" because the box
+  // started with "=" already; the box now starts empty, so the second "=" is the learner's own
+  // (owner's decision after the Codex review, Sept 2026). A checked wrong answer, not a concept mistake.
+  if (notes.includes('extra-equals')) {
+    return { correct: false, score: 0, noMistake: true, method: 'check', outcome: OUTCOME.INCORRECT, reason: 'syntax',
+      feedback: 'Excel can\'t read this formula: it starts with "==". A formula starts with a single "=". Remove one and check again.' };
+  }
   const tips = [];
-  if (notes.includes('extra-equals')) tips.push('Your formula started with "==". In Excel a formula starts with a single "=", so it was read as starting with one.');
   if (notes.includes('closed-brackets')) tips.push('A closing bracket ")" was missing at the end. Excel offers to add it for you, so it was checked with the bracket added.');
   const notice = tips.length ? tips.join(' ') : null;
   const r = gradeClean(item, input);

@@ -1,6 +1,7 @@
 // Runs learner SQL against the practice databases in a separate thread, so a runaway
 // query can be stopped. Every statement runs inside a savepoint that is rolled back,
-// which keeps the practice databases untouched.
+// which keeps the practice databases untouched, and after a PRAGMA (which can change the
+// connection itself) the next query gets a fresh connection.
 import { parentPort, workerData } from 'node:worker_threads';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -40,6 +41,9 @@ function addFunctions(d) {
     });
   }
 }
+
+// a statement that is a PRAGMA once leading comments are skipped
+const PRAGMA = /^\s*(?:(?:--[^\n]*(?:\n|$)|\/\*[\s\S]*?\*\/)\s*)*PRAGMA\b/i;
 
 /** A problem with the practice setup, not with the learner's SQL. */
 class SetupError extends Error {}
@@ -87,5 +91,9 @@ parentPort.on('message', ({ id, db, sql, maxRows = 1000 }) => {
   } catch (e) {
     try { d && d.exec('ROLLBACK TO learner; RELEASE learner'); } catch { /* nothing to roll back */ }
     parentPort.postMessage({ id, ok: false, error: String(e.message || e), ms: Date.now() - started });
+  } finally {
+    // A PRAGMA can change the connection itself (case_sensitive_like, for one), which no rollback
+    // undoes: the next query gets a fresh connection, so every query starts from the same settings.
+    if (PRAGMA.test(sql) && dbs.get(db) === d) { try { d.close(); } catch { /* already closed */ } dbs.delete(db); }
   }
 });
