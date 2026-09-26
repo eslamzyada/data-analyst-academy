@@ -84,7 +84,7 @@ function TaskList() {
               <ActivityBadge status={t.status} />
             </div>
             <h3 style={{ margin: '10px 0 4px' }}>{t.title || 'Practice task'}</h3>
-            <div className="small muted">{t.topicTitle} · {t.level}{t.isChallenge ? ' · Challenge' : ''}</div>
+            <div className="small muted">{t.topicTitle} · {t.level} curriculum{t.isChallenge ? ' · Challenge' : ''}</div>
             <div className="row" style={{ marginTop: 10 }}>
               <Stars n={t.difficulty} />
               <span className="badge">{typeLabel(t.type)}</span>{t.business && <span className="badge">{t.business}</span>}

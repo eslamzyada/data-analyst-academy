@@ -662,6 +662,15 @@ const scenarios = {
     check('standing: the topic page says Competent as its Mastery stage, the tier as the curriculum and the percent as covered',
       panel && panel.standing.join() === 'Competent' && /Mastery stage/i.test(panel.text) && /(Beginner|Intermediate|Advanced) curriculum/.test(head) && head.includes(`${fx.percent}% covered`), JSON.stringify({ standing: panel?.standing, panel: panel?.text.slice(0, 80), head: head.slice(-120) }));
 
+    // the quiz list and the practice library name each topic's tier too: as the curriculum (Codex review)
+    const bareTier = async (hash) => {
+      await open(hash);
+      return b.evaluate(`[...document.querySelectorAll('.main .tiny, .main .small')].map((e) => e.textContent.trim())
+        .filter((t) => /^(Beginner|Intermediate|Advanced) · \\d+ q$/.test(t) || / · (Beginner|Intermediate|Advanced)( · Challenge)?$/.test(t))`);
+    };
+    const bare = [...await bareTier('#/quizzes'), ...await bareTier('#/practice')];
+    check('standing: the quiz list and the practice library label every topic tier as the curriculum', bare.length === 0, bare.slice(0, 3).join(' | '));
+
     // 4. an established learner (the fixture used for manual testing: weeks of work in every skill)
     await stopServer();
     const fixture = spawnSync(process.execPath, ['tools/fixture.js', tmp, '--force'], { cwd: APP, encoding: 'utf8', timeout: 120000 });

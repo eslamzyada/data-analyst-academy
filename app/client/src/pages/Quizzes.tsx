@@ -59,7 +59,7 @@ export default function Quizzes() {
               {s.topics.map((t: any) => (
                 <div key={t.id} className="list-row">
                   <div style={{ flex: 1 }}>
-                    <div className="row between"><span>{t.title}</span><span className="tiny muted">{t.level} · {t.count} q</span></div>
+                    <div className="row between"><span>{t.title}</span><span className="tiny muted">{t.level} curriculum · {t.count} q</span></div>
                     <div style={{ width: '100%', marginTop: 4 }}><Bar value={t.mastery} size="thin" color={s.color} /></div>
                   </div>
                   {t.unlocked ? <Link className="btn sm" to={`/quiz/topic/${t.id}`}>Quiz</Link> : <span className="badge"><Icon name="lock" size={11} /></span>}
