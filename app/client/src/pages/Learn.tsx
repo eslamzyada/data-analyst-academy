@@ -1,7 +1,7 @@
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api, SKILL_COLORS } from '../api';
 import Icon from '../components/Icon';
-import { Bar, Loading, ErrorBox, LockedBadge, useApi } from '../components/ui';
+import { Bar, Loading, ErrorBox, LockedBadge, PlacedNote, useApi } from '../components/ui';
 import { StageLadder, StageTag } from '../components/Mastery';
 
 export default function Learn() {
@@ -70,16 +70,17 @@ export function SkillPath() {
       <div className="path">
         {tiers.map((g: any) => (
           <div key={g.lv} className="path-group">
-            <div className="label" style={{ marginBottom: 10 }}>{g.lv}</div>
+            <div className="label" style={{ marginBottom: 10 }}>{g.lv} curriculum</div>
             {g.topics.map((t: any) => {
               const rec = t.id === data.recommended;
               const [iconCls, icon] = nodeIcon(t);
               return (
                 <div key={t.id} className={`path-node ${t.status === 'locked' ? 'locked' : ''} ${rec ? 'rec' : ''}`} onClick={() => t.status !== 'locked' && nav(`/topic/${t.id}`)}>
-                  <div className={`node-icon ${iconCls}`}>{t.status === 'locked' ? <Icon name="lock" size={15} /> : icon}</div>
+                  <div className={`node-icon ${iconCls}`} title={iconCls === 'placed' ? 'Credited by your placement check' : undefined}>{t.status === 'locked' ? <Icon name="lock" size={15} /> : icon}</div>
                   <div>
                     <div className="row"><b>{t.title}</b>{rec && <span className="badge blue">Recommended next</span>}{t.reviewDue && <span className="badge amber">Review due</span>}</div>
                     <div className="small muted">{t.summary}</div>
+                    {t.status === 'placed' && <PlacedNote />}
                     {t.status === 'locked' && t.prereqs?.length > 0 && <div className="tiny muted" style={{ marginTop: 2 }}>Unlocks when you're comfortable with: {t.prereqs.join(', ')}</div>}
                   </div>
                   <div className="stack" style={{ alignItems: 'flex-end', gap: 6, minWidth: 110 }}>

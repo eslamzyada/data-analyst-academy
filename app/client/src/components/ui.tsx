@@ -42,6 +42,15 @@ export function LockedBadge() {
   return <span className="badge"><Icon name="lock" size={12} />Locked</span>;
 }
 
+/**
+ * A topic the placement check credited: it counts towards "% covered", but it is not evidence of what
+ * the learner can do, so its Mastery stage still starts from their own work ("Not started" until then).
+ * Said in words, so the coverage beside "Not started" is not a puzzle.
+ */
+export function PlacedNote() {
+  return <span className="tiny muted placed-note">Credited by your placement check; a review will confirm it.</span>;
+}
+
 export function SkillTag({ skill, name }: { skill: string; name?: string }) {
   return (
     <span className="badge" style={{ background: `${SKILL_COLORS[skill]}14`, color: SKILL_COLORS[skill] }}>

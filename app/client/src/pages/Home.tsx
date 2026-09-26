@@ -63,7 +63,7 @@ export default function Home() {
               <Bar value={h.overall} size="thick" />
               <div className="divider" style={{ background: 'rgba(255,255,255,0.2)' }} />
               <div className="label" style={{ color: '#dbe7ff' }}>Today's focus</div>
-              <h2 style={{ margin: '4px 0 2px' }}>{f.skillName} · {f.topic.level} topic</h2>
+              <h2 style={{ margin: '4px 0 2px' }}>{f.skillName} · {f.topic.level} curriculum</h2>
               <div style={{ fontSize: 17, marginBottom: 6 }}>Current topic: <b>{f.topic.title}</b></div>
               <p className="muted" style={{ margin: '0 0 16px' }}>{f.reason}{h.focusAdapt && <><br /><span style={{ color: '#fff' }}>{h.focusAdapt.message}</span></>}</p>
               <div className="row">

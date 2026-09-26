@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { SKILL_COLORS } from '../api';
 import Icon from '../components/Icon';
-import { Bar, Blocks, Loading, ErrorBox, LockedBadge, useApi } from '../components/ui';
+import { Bar, Blocks, Loading, ErrorBox, LockedBadge, PlacedNote, useApi } from '../components/ui';
 import { Dims, NextSteps, StageLadder, StageTag } from '../components/Mastery';
 
 export default function Progress() {
@@ -106,7 +106,7 @@ export default function Progress() {
                   <td>{t.status === 'locked' ? t.title : <Link to={`/topic/${t.id}`}>{t.title}</Link>}</td>
                   <td style={{ color: SKILL_COLORS[t.skill] }}>{t.skill.toUpperCase()}</td><td>{t.level}</td>
                   <td>{t.status === 'locked' ? <LockedBadge /> : <span className="row" style={{ gap: 6 }}><StageLadder stage={t.masteryStage} compact /><StageTag stage={t.masteryStage} /></span>}</td>
-                  <td style={{ minWidth: 130 }}><Bar value={t.mastery} size="thin" color={SKILL_COLORS[t.skill]} /><span className="tiny muted">{t.mastery}% covered</span></td>
+                  <td style={{ minWidth: 130 }}><Bar value={t.mastery} size="thin" color={SKILL_COLORS[t.skill]} /><span className="tiny muted">{t.mastery}% covered</span>{t.status === 'placed' && <div><PlacedNote /></div>}</td>
                   <td className="small">{t.reviewDue ? <span className="badge amber">Due</span> : t.nextReview ? t.nextReview.slice(0, 10) : ''}</td>
                 </tr>
               ))}

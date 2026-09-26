@@ -359,7 +359,7 @@ try {
   const prog = (await api('GET', '/api/progress')).json;
   check('progress page data', prog.legacyLevel && prog.skills.length === 5 && Array.isArray(prog.topics));
   check('nothing is "mastered" after one session', prog.topics.every((t) => t.status !== 'mastered'));
-  check('level stays honest (Level 1 or 2)', prog.legacyLevel.level.n <= 2, JSON.stringify(prog.legacyLevel.level));
+  check('level stays honest (Level 1 or 2)', prog.legacyLevel?.current?.n <= 2, JSON.stringify(prog.legacyLevel));
   const ds = (await api('GET', '/api/datasets/cedarline-q2/preview?limit=5')).json;
   check('dataset preview works (xlsx with title rows)', ds.columns[0] === 'LineID' && ds.rows.length === 5, JSON.stringify(ds).slice(0, 200));
   const dl = await fetch(BASE + '/files/excel/summit_coffee_sales.xlsx');
@@ -717,6 +717,7 @@ try {
     const MASTERY_LABELS = ['Not started', 'Introduced', 'Learning', 'Practicing', 'Competent', 'Independent', 'Strong'];
     const TIER = /^(Not started|Beginner|Intermediate|Advanced)( \(complete\))?$/;
     const PLACEMENT_STEPS = ['Basics', 'Beginner', 'Intermediate', 'Advanced'];
+    const TIER_WORD = /^(Beginner|Intermediate|Advanced)$/;
     const wrong = [];
     const walk = (v, where) => {
       if (Array.isArray(v)) { v.forEach((x, i) => walk(x, `${where}[${i}]`)); return; }
@@ -727,6 +728,8 @@ try {
         if ((k === 'stageLabel' || k === 'masteryStageLabel') && !MASTERY_LABELS.includes(x)) wrong.push(`${at} = ${JSON.stringify(x)}`);
         if (k === 'tierStage' && !TIER.test(String(x))) wrong.push(`${at} = ${JSON.stringify(x)}`);
         if (k === 'placementStage' && !PLACEMENT_STEPS.includes(x)) wrong.push(`${at} = ${JSON.stringify(x)}`);
+        // `level` is a curriculum tier (topics, items); on a Real Analyst request it is the brief's clarity, 1-3, a property of the task
+        if (k === 'level' && !(typeof x === 'string' && TIER_WORD.test(x)) && !(/(^|\.)analyst\b/.test(where) && Number.isInteger(x))) wrong.push(`${at} = ${JSON.stringify(x).slice(0, 60)}`);
         walk(x, at);
       }
     };
@@ -737,7 +740,7 @@ try {
       placementNext: (await api('POST', '/api/placement/next', { selfReport: { excel: 'little', sql: 'never', pq: 'never', pbi: 'never' }, answers: {} })).json,
     };
     for (const [name, body] of Object.entries(payloads)) walk(body, name);
-    check('STANDING: masteryStage (and a stage inside Mastery objects) is always one of the six stages, tierStage always a curriculum tier, placementStage always a placement step', wrong.length === 0, wrong.slice(0, 6).join(' | '));
+    check('STANDING: masteryStage (and a stage inside Mastery objects) is always one of the six stages, tierStage and level always a curriculum tier, placementStage always a placement step', wrong.length === 0, wrong.slice(0, 6).join(' | '));
     const skillsAll = [...payloads.skills, payloads.skillExcel, ...payloads.home.skills, ...payloads.progress.skills];
     check('STANDING: every skill summary names both, unambiguously (masteryStage + tierStage, no plain stage)',
       skillsAll.every((s) => MASTERY_STAGES.includes(s.masteryStage) && TIER.test(s.tierStage) && !('stage' in s) && typeof s.masteryMeaning === 'string'), JSON.stringify(skillsAll[0]).slice(0, 240));
@@ -746,7 +749,7 @@ try {
       cards.every((t) => MASTERY_STAGES.includes(t.masteryStage) && !('stage' in t)), String(JSON.stringify(cards.find((t) => !MASTERY_STAGES.includes(t.masteryStage) || 'stage' in t))).slice(0, 240));
     check('STANDING: the placement step is placementStage, not stage', PLACEMENT_STEPS.includes(payloads.placementNext.placementStage) && !('stage' in payloads.placementNext) && typeof payloads.placementNext.placementStageWords === 'string', JSON.stringify(payloads.placementNext).slice(0, 200));
     check('STANDING: the retired 1-7 levels are legacyLevel (documented in CLAUDE.md), not a second meaning of level',
-      payloads.home.legacyLevel?.level?.n >= 1 && payloads.progress.legacyLevel?.level?.n >= 1 && !('level' in payloads.home) && !('level' in payloads.progress), JSON.stringify(payloads.progress.legacyLevel).slice(0, 160));
+      payloads.home.legacyLevel?.current?.n >= 1 && payloads.progress.legacyLevel?.current?.n >= 1 && !('level' in payloads.home) && !('level' in payloads.progress) && !('level' in payloads.progress.legacyLevel), JSON.stringify(payloads.progress.legacyLevel).slice(0, 160));
   }
   const home2 = (await api('GET', '/api/home')).json;
   check('MASTERY: home shows the next milestone and a Real Analyst task', home2.milestones && home2.milestones.total === 6 && home2.analyst && (home2.analyst.recommended || home2.analyst.assessment));

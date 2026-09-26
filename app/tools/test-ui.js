@@ -566,6 +566,10 @@ const scenarios = {
         if (n > 1) bad.push(n + ' standings in one row: ' + box.innerText.replace(/\\s+/g, ' ').slice(0, 70));
       }
       if (/You are at:/.test(main.innerText)) bad.push('the curriculum tier presented as "You are at"');
+      for (const el of main.querySelectorAll('h1, h2, h3, .label, .badge')) {
+        const t = el.textContent.trim();
+        if (/\\b(Beginner|Intermediate|Advanced)\\b/.test(t) && !/curriculum/i.test(t)) bad.push('a curriculum tier not labelled as curriculum: ' + t.slice(0, 50));
+      }
       return bad;
     })()`;
     const open = async (hash) => {
@@ -591,7 +595,32 @@ const scenarios = {
     await onboard();
     await auditAll('fresh learner');
 
+    // 1b. a learner the placement check credited (Excel answered right): credited topics count as covered,
+    //     but their Mastery stage starts from the learner's own work, and the page says so in words
+    await api('POST', '/api/reset', { confirm: 'RESET' });
+    await api('POST', '/api/profile', { name: 'Tester' });
+    const selfReport = { excel: 'regular', sql: 'never', pq: 'never', pbi: 'never' };
+    const plAnswers = {};
+    for (let i = 0; i < 40; i++) {
+      const nx = await api('POST', '/api/placement/next', { selfReport, answers: plAnswers });
+      if (nx.done) break;
+      const q = content.items[nx.question.id];
+      plAnswers[nx.question.id] = nx.area === 'excel' ? toShownAnswer(q, q.answer) : 'idk';
+    }
+    await api('POST', '/api/placement', { selfReport, answers: plAnswers });
+    await auditAll('placement-credited learner');
+    await open('#/learn/excel');
+    const placedRows = await b.evaluate(`[...document.querySelectorAll('.main .path-node')].filter((n) => n.querySelector('.node-icon.placed')).map((n) => ({ standing: [...n.querySelectorAll('[data-standing]')].map((x) => x.textContent.trim()), note: !!n.querySelector('.placed-note') }))`);
+    check('standing: every placement-credited topic on the path shows one standing (Not started) and says in words that the placement credited it',
+      placedRows.length > 0 && placedRows.every((r) => r.standing.join() === 'Not started' && r.note), JSON.stringify(placedRows.slice(0, 3)));
+    await open('#/progress');
+    await b.evaluate(`(() => { const d = document.querySelector('.main .every-topic'); if (d) d.open = true; })()`);
+    const placedTable = await b.evaluate(`[...document.querySelectorAll('.main .every-topic tbody tr')].filter((r) => r.querySelector('.placed-note')).map((r) => [...r.querySelectorAll('[data-standing]')].map((x) => x.textContent.trim()).join())`);
+    check('standing: in "Show every topic" the credited topics say so, beside their one standing', placedTable.length > 0 && placedTable.every((s) => s === 'Not started'), JSON.stringify(placedTable.slice(0, 4)));
+
     // 2. a calibrating learner: a few checked answers
+    await api('POST', '/api/reset', { confirm: 'RESET' });
+    await onboard();
     const quiz = Object.values(content.items).filter((it) => it.topicId === 'xl-basics' && it.source === 'quiz' && it.type === 'mc').slice(0, 5);
     for (const it of quiz) await api('POST', `/api/items/${it.id}/submit`, { answer: toShownAnswer(it, it.answer), source: 'quiz' });
     const phase = (await api('GET', '/api/home')).phase?.phase;
@@ -630,8 +659,8 @@ const scenarios = {
     await open(`#/topic/${fx.topicId}`);
     const panel = await standingIn(`document.querySelector('.main .mastery-panel')`);
     const head = await b.evaluate(`(document.querySelector('.main .page-head')?.innerText || '').replace(/\\s+/g, ' ')`);
-    check('standing: the topic page says Competent as its Mastery stage, the curriculum as "… topic" and the percent as covered',
-      panel && panel.standing.join() === 'Competent' && /Mastery stage/i.test(panel.text) && / topic\b/.test(head) && head.includes(`${fx.percent}% covered`), JSON.stringify({ standing: panel?.standing, panel: panel?.text.slice(0, 80), head: head.slice(-120) }));
+    check('standing: the topic page says Competent as its Mastery stage, the tier as the curriculum and the percent as covered',
+      panel && panel.standing.join() === 'Competent' && /Mastery stage/i.test(panel.text) && /(Beginner|Intermediate|Advanced) curriculum/.test(head) && head.includes(`${fx.percent}% covered`), JSON.stringify({ standing: panel?.standing, panel: panel?.text.slice(0, 80), head: head.slice(-120) }));
 
     // 4. an established learner (the fixture used for manual testing: weeks of work in every skill)
     await stopServer();

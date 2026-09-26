@@ -4,7 +4,7 @@ import { api, SKILL_COLORS, trackActivity } from '../api';
 import ItemRunner from '../components/ItemRunner';
 import QuizSession from '../components/QuizSession';
 import Icon from '../components/Icon';
-import { Bar, Loading, ErrorBox, Markdown, Stars, useApi, LEVEL_WORD } from '../components/ui';
+import { Bar, Loading, ErrorBox, Markdown, Stars, PlacedNote, useApi, LEVEL_WORD } from '../components/ui';
 import { STATE, STATE_LABEL } from '../../../shared/lifecycle.js';
 import { Dims, NextSteps, StageLadder, StageTag } from '../components/Mastery';
 
@@ -69,8 +69,9 @@ export default function Topic() {
           <p>{t.summary}</p>
         </div>
         <div style={{ minWidth: 240 }}>
-          <div className="row between small"><span className="badge" style={{ color: SKILL_COLORS[t.skill] }}>{t.skillName} · {t.level} topic</span><span><b>{t.mastery}%</b> covered</span></div>
+          <div className="row between small"><span className="badge" style={{ color: SKILL_COLORS[t.skill] }}>{t.skillName} · {t.level} curriculum</span><span><b>{t.mastery}%</b> covered</span></div>
           <Bar value={t.mastery} color={SKILL_COLORS[t.skill]} />
+          {t.status === 'placed' && <div style={{ marginTop: 6 }}><PlacedNote /></div>}
           {t.reviewDue && <div className="small" style={{ marginTop: 6, color: 'var(--warn)' }}>Due for a review, so it stays fresh.</div>}
         </div>
       </div>

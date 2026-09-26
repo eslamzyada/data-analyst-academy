@@ -120,6 +120,12 @@ function profile() {
 //   masteryStage  what the learner can do (the Mastery Layer's six stages) - the standing pages show
 //   tierStage     where the learner is in the curriculum (Beginner / Intermediate / Advanced)
 //   mastery (%)   how much of a topic is covered, with `status` - internal: unlocking, reviews, plans
+/** The retired 1-7 levels, read by no page: `current` (not `level`, which on topics means the curriculum tier). */
+function legacyLevel() {
+  const { level, ...rest } = engine.currentLevel();
+  return { current: level, ...rest };
+}
+
 function topicCard(t) {
   const s = engine.topicStatus(t);
   const v = mastery.topicView(t.id);
@@ -157,7 +163,7 @@ app.get('/api/home', wrap((req, res) => {
   const f = engine.focus();
   const topic = content.topicMap[f.topicId];
   const practice = engine.pickPractice(topic);
-  const lvl = engine.currentLevel();
+  const lvl = legacyLevel();
   const plan = store.get('SELECT plan_json, done_json FROM daily_plan WHERE day = ?', [new Date().toLocaleDateString('en-CA')]);
   res.json({
     // legacyLevel: the retired 1-7 levels (milestones replaced them on every page); no page reads it
@@ -1277,7 +1283,7 @@ app.get('/api/progress', wrap((req, res) => {
   const days = store.all("SELECT substr(ts,1,10) AS d, COUNT(*) AS n FROM attempts WHERE source <> 'placement' GROUP BY 1 ORDER BY 1 DESC LIMIT 28");
   const next = engine.focus();
   res.json({
-    legacyLevel: engine.currentLevel(), overall: engine.overallProgress(),
+    legacyLevel: legacyLevel(), overall: engine.overallProgress(),
     skills: content.skills.map((sk) => ({ ...skillSummary(sk), tiers: sk.levels.map((tier) => ({ tier, avg: Math.round(engine.tierAverage(sk.id, tier)) })) })),
     strengths: engine.strengths().map((x) => { const v = mastery.topicView(x.topicId); return { ...x, masteryStage: v.stage, masteryStageLabel: v.stageLabel }; }),
     weaknesses: engine.weaknesses(), mistakes: engine.openMistakes(12), recent: engine.recentMistakes(8),
