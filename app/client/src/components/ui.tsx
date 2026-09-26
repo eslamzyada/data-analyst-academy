@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { marked } from 'marked';
-import { api, SKILL_COLORS, STATUS_LABEL } from '../api';
+import { api, SKILL_COLORS } from '../api';
 import Icon from './Icon';
 
 marked.setOptions({ gfm: true, breaks: false });
@@ -32,9 +32,23 @@ export function Stars({ n = 2 }: { n?: number }) {
 }
 export const LEVEL_WORD = ['', 'Beginner', 'Easy', 'Intermediate', 'Advanced', 'Expert'];
 
-export function StatusBadge({ status }: { status: string }) {
-  const cls = status === 'placed' ? 'amber' : status === 'mastered' || status === 'good' ? 'green' : status === 'locked' ? '' : status === 'new' ? '' : 'blue';
-  return <span className={`badge ${cls}`}>{status === 'locked' && <Icon name="lock" size={12} />}{STATUS_LABEL[status] || status}</span>;
+/**
+ * Whether a topic can be opened yet: an access state, not a standing. The old percent words
+ * (Learning / Practicing / Good / Mastered / To confirm) are no longer shown anywhere: they read like
+ * the Mastery stages but followed different rules. The learner's standing is the Mastery stage
+ * (StageTag); a topic's percent is shown as "% covered".
+ */
+export function LockedBadge() {
+  return <span className="badge"><Icon name="lock" size={12} />Locked</span>;
+}
+
+/**
+ * A topic the placement check credited: it counts towards "% covered", but it is not evidence of what
+ * the learner can do, so its Mastery stage still starts from their own work ("Not started" until then).
+ * Said in words, so the coverage beside "Not started" is not a puzzle.
+ */
+export function PlacedNote() {
+  return <span className="tiny muted placed-note">Credited by your placement check; a review will confirm it.</span>;
 }
 
 export function SkillTag({ skill, name }: { skill: string; name?: string }) {

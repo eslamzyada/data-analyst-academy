@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { SKILL_COLORS } from '../api';
 import Icon from '../components/Icon';
-import { Bar, Blocks, Loading, ErrorBox, StatusBadge, useApi } from '../components/ui';
+import { Bar, Blocks, Loading, ErrorBox, LockedBadge, PlacedNote, useApi } from '../components/ui';
 import { Dims, NextSteps, StageLadder, StageTag } from '../components/Mastery';
 
 export default function Progress() {
@@ -33,19 +33,22 @@ export default function Progress() {
       <div className="grid two section">
         <div className="card">
           <h3>Skills</h3>
+          {/* the Mastery stage is the standing; curriculum position and coverage are labelled as what they are */}
           {p.skills.map((s: any) => (
-            <div key={s.id} style={{ padding: '10px 0', borderBottom: '1px solid var(--line-2)' }}>
-              <div className="row between"><b style={{ color: SKILL_COLORS[s.id] }}>{s.name}</b><span className="small">{s.stage} · <b>{s.progress}%</b> of topics</span></div>
+            <div key={s.id} className="skill-standing" style={{ padding: '10px 0', borderBottom: '1px solid var(--line-2)' }}>
+              <div className="row between"><b style={{ color: SKILL_COLORS[s.id] }}>{s.name}</b><span className="row" style={{ gap: 6 }}><StageLadder stage={s.masteryStage} compact /><StageTag stage={s.masteryStage} /></span></div>
+              <div className="small" style={{ margin: '2px 0 4px' }}>{s.masteryMeaning}</div>
+              <div className="small muted">Current curriculum: <b>{s.tierStage}</b> · <b>{s.progress}%</b> of topics covered</div>
               <Blocks value={s.progress} />
-              <div className="row small muted" style={{ gap: 14, marginTop: 2 }}>{s.tiers.map((t: any) => <span key={t.tier}>{t.tier}: {t.avg}%</span>)}</div>
+              <div className="row small muted" style={{ gap: 14, marginTop: 2 }}>{s.tiers.map((t: any) => <span key={t.tier}>{t.tier} topics: {t.avg}% covered</span>)}</div>
             </div>
           ))}
         </div>
         <div className="stack">
           <div className="card">
-            <h3>You are good at</h3>
-            {p.strengths.length === 0 ? <p className="muted small">Not enough evidence yet. Topics appear here once your own work shows them at 75% or more.</p>
-              : p.strengths.map((s: any) => <div key={s.topicId} className="list-row"><Link to={`/topic/${s.topicId}`}>{s.title}</Link><span className="badge green">{s.mastery}%</span></div>)}
+            <h3>Most covered topics</h3>
+            {p.strengths.length === 0 ? <p className="muted small">Not enough graded work yet. Topics appear here once your own work covers 75% or more of them.</p>
+              : p.strengths.map((s: any) => <div key={s.topicId} className="list-row"><Link to={`/topic/${s.topicId}`}>{s.title}</Link><span className="row" style={{ gap: 6 }}><StageTag stage={s.masteryStage} /><span className="small muted">{s.mastery}% covered</span></span></div>)}
           </div>
           <div className="card">
             <h3>Practice more</h3>
@@ -93,18 +96,17 @@ export default function Progress() {
       </div>
 
       <details className="section card every-topic">
-        <summary><h3 style={{ display: 'inline' }}>Show every topic</h3> <span className="small muted">stage, status and reviews for all {p.topics.length} topics</span></summary>
+        <summary><h3 style={{ display: 'inline' }}>Show every topic</h3> <span className="small muted">Mastery stage, coverage and reviews for all {p.topics.length} topics</span></summary>
         <div className="table-wrap" style={{ maxHeight: 440, marginTop: 10 }}>
           <table className="data">
-            <thead><tr><th>Topic</th><th>Skill</th><th>Level</th><th>Stage</th><th>Status</th><th>Progress</th><th>Review</th></tr></thead>
+            <thead><tr><th>Topic</th><th>Skill</th><th>Curriculum</th><th>Mastery stage</th><th>Covered</th><th>Review</th></tr></thead>
             <tbody>
               {p.topics.map((t: any) => (
                 <tr key={t.id}>
                   <td>{t.status === 'locked' ? t.title : <Link to={`/topic/${t.id}`}>{t.title}</Link>}</td>
                   <td style={{ color: SKILL_COLORS[t.skill] }}>{t.skill.toUpperCase()}</td><td>{t.level}</td>
-                  <td><span className="row" style={{ gap: 6 }}><StageLadder stage={t.stage} compact />{t.stageLabel}</span></td>
-                  <td><StatusBadge status={t.status} /></td>
-                  <td style={{ minWidth: 120 }}><Bar value={t.mastery} size="thin" color={SKILL_COLORS[t.skill]} /></td>
+                  <td>{t.status === 'locked' ? <LockedBadge /> : <span className="row" style={{ gap: 6 }}><StageLadder stage={t.masteryStage} compact /><StageTag stage={t.masteryStage} /></span>}</td>
+                  <td style={{ minWidth: 130 }}><Bar value={t.mastery} size="thin" color={SKILL_COLORS[t.skill]} /><span className="tiny muted">{t.mastery}% covered</span>{t.status === 'placed' && <div><PlacedNote /></div>}</td>
                   <td className="small">{t.reviewDue ? <span className="badge amber">Due</span> : t.nextReview ? t.nextReview.slice(0, 10) : ''}</td>
                 </tr>
               ))}

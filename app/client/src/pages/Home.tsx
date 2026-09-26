@@ -1,7 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { SKILL_COLORS } from '../api';
 import Icon from '../components/Icon';
-import { Bar, Blocks, Loading, ErrorBox, Stars, StatusBadge, useApi, LEVEL_WORD } from '../components/ui';
+import { Bar, Blocks, Loading, ErrorBox, Stars, useApi, LEVEL_WORD } from '../components/ui';
 import { StageLadder, StageTag } from '../components/Mastery';
 
 export default function Home() {
@@ -56,14 +56,14 @@ export default function Home() {
             </>
           ) : (
             <>
-              <div className="label" style={{ color: '#dbe7ff' }}>Data Analyst Mastery</div>
+              <div className="label" style={{ color: '#dbe7ff' }}>Your learning path</div>
               <div className="row between" style={{ marginTop: 6 }}>
-                <span style={{ fontSize: 15 }}>Overall progress</span><b style={{ fontSize: 22 }}>{h.overall}%</b>
+                <span style={{ fontSize: 15 }}>Topics covered</span><b style={{ fontSize: 22 }}>{h.overall}%</b>
               </div>
               <Bar value={h.overall} size="thick" />
               <div className="divider" style={{ background: 'rgba(255,255,255,0.2)' }} />
               <div className="label" style={{ color: '#dbe7ff' }}>Today's focus</div>
-              <h2 style={{ margin: '4px 0 2px' }}>{f.skillName} · {f.topic.level}</h2>
+              <h2 style={{ margin: '4px 0 2px' }}>{f.skillName} · {f.topic.level} curriculum</h2>
               <div style={{ fontSize: 17, marginBottom: 6 }}>Current topic: <b>{f.topic.title}</b></div>
               <p className="muted" style={{ margin: '0 0 16px' }}>{f.reason}{h.focusAdapt && <><br /><span style={{ color: '#fff' }}>{h.focusAdapt.message}</span></>}</p>
               <div className="row">
@@ -165,8 +165,8 @@ export default function Home() {
             <div key={t.id} className="list-row"><span>{t.title}</span><Link className="btn sm" to={`/quiz/topic/${t.id}?review=1`}>Review</Link></div>
           ))}
           <div className="divider" />
-          <div className="label">Current topic status</div>
-          <div className="row" style={{ marginTop: 8 }}><span>{f.topic.title}</span><StatusBadge status={f.topic.status} /><span className="muted small">{f.topic.mastery}%</span></div>
+          <div className="label">Current topic</div>
+          <div className="row" style={{ marginTop: 8 }}><span>{f.topic.title}</span><StageTag stage={f.topic.masteryStage} /><span className="muted small">{f.topic.mastery}% covered</span></div>
         </div>
       </div>
     </div>

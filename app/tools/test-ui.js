@@ -2,13 +2,13 @@
 // real headless Edge/Chrome, refreshes and restarts in the middle of work, and checks that
 // nothing is lost and that every activity ends with a clear next step.
 // Run: npm run test:ui
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { launch } from './lib/browser.js';
-const { loadContent, content } = await import('../server/content/index.js');
+const { loadContent, content, toShownAnswer, kindOf, metaOf } = await import('../server/content/index.js');
 
 const APP = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 loadContent(path.join(APP, 'data'));   // model answers, to play the learner who gets it right
@@ -540,6 +540,157 @@ const scenarios = {
     await b.click('Learn', { within: '.sidebar' });
     await b.waitFor(`/Excel/i.test(document.querySelector('.main')?.innerText || '') && !/Something went wrong/.test(document.body.innerText)`, { label: 'learn after error', timeout: 8000 }).catch(() => {});
     check('pageerror: moving to another page works normally again', !/Something went wrong/.test(await b.text('body')) && /Excel/i.test(await b.text()));
+  },
+
+  // ------------------------------------------------------------ learner standing: one word for how good you are
+  // The Mastery stage is the only standing a page shows; the curriculum tier is labelled as the
+  // curriculum; a topic's percent is "% covered". Checked for a fresh, a calibrating and an established
+  // learner, and on the exact contradiction the architecture review found (a topic whose percent said
+  // "Learning" while its evidence says "Competent"). With ACADEMY_UI_SEED_DB (a COPY of real progress
+  // inside the temporary folder, never the real file) the same checks run on that history too.
+  async standing(b) {
+    const { assertTestDataDir } = await import('../server/safety.js');
+    const audit = `(() => {
+      const bad = [];
+      const OLD = ['Good', 'Mastered', 'To confirm'];
+      const STAGE_WORDS = ['Not started', 'Introduced', 'Learning', 'Practicing', 'Competent', 'Independent', 'Strong'];
+      const main = document.querySelector('.main') || document.body;
+      for (const el of main.querySelectorAll('.badge')) {
+        const t = el.textContent.trim();
+        if (OLD.includes(t)) bad.push('an old percent word as a badge: ' + t);
+        if (STAGE_WORDS.includes(t) && el.getAttribute('data-standing') !== 'mastery') bad.push('a stage word outside the Mastery stage label: ' + t);
+        if (/^(Beginner|Intermediate|Advanced)( \\(complete\\))?$/.test(t)) bad.push('a curriculum tier shown as a bare badge: ' + t);
+      }
+      for (const box of main.querySelectorAll('.skill-card, .skill-standing, .path-node, .every-topic tbody tr, .list-row, .mastery-head')) {
+        const n = box.querySelectorAll('[data-standing]').length;
+        if (n > 1) bad.push(n + ' standings in one row: ' + box.innerText.replace(/\\s+/g, ' ').slice(0, 70));
+      }
+      if (/You are at:/.test(main.innerText)) bad.push('the curriculum tier presented as "You are at"');
+      for (const el of main.querySelectorAll('h1, h2, h3, .label, .badge')) {
+        const t = el.textContent.trim();
+        if (/\\b(Beginner|Intermediate|Advanced)\\b/.test(t) && !/curriculum/i.test(t)) bad.push('a curriculum tier not labelled as curriculum: ' + t.slice(0, 50));
+      }
+      return bad;
+    })()`;
+    const open = async (hash) => {
+      await b.goto(`${BASE}/${hash}`);
+      await b.waitFor(`(() => { const m = document.querySelector('.main'); return !!m && m.innerText.length > 80 && !/Loading…/.test(m.innerText); })()`, { label: `page ${hash}`, timeout: 8000 }).catch(() => {});
+      await sleep(150);
+    };
+    const pages = [['Home', '#/'], ['Learn', '#/learn'], ['the Excel path', '#/learn/excel'], ['Progress', '#/progress']];
+    const auditAll = async (who, extra = []) => {
+      for (const [name, hash] of [...pages, ...extra]) {
+        await open(hash);
+        const bad = await b.evaluate(audit);
+        check(`standing (${who}): ${name} shows one standing and no competing words`, bad.length === 0, bad.slice(0, 4).join(' | '));
+      }
+      await open('#/learn');
+      const cards = await b.evaluate(`[...document.querySelectorAll('.main .skill-card')].map((c) => ({ standing: c.querySelectorAll('[data-standing]').length, curriculum: /Current curriculum:/.test(c.innerText) }))`);
+      check(`standing (${who}): every Learn skill card has one Mastery stage and a labelled curriculum`, cards.length === 5 && cards.every((c) => c.standing === 1 && c.curriculum), JSON.stringify(cards));
+    };
+    const onboard = async () => { await api('POST', '/api/profile', { name: 'Tester' }); await api('POST', '/api/placement/skip', {}); };
+
+    // 1. a fresh learner
+    await api('POST', '/api/reset', { confirm: 'RESET' });
+    await onboard();
+    await auditAll('fresh learner');
+
+    // 1b. a learner the placement check credited (Excel answered right): credited topics count as covered,
+    //     but their Mastery stage starts from the learner's own work, and the page says so in words
+    await api('POST', '/api/reset', { confirm: 'RESET' });
+    await api('POST', '/api/profile', { name: 'Tester' });
+    const selfReport = { excel: 'regular', sql: 'never', pq: 'never', pbi: 'never' };
+    const plAnswers = {};
+    for (let i = 0; i < 40; i++) {
+      const nx = await api('POST', '/api/placement/next', { selfReport, answers: plAnswers });
+      if (nx.done) break;
+      const q = content.items[nx.question.id];
+      plAnswers[nx.question.id] = nx.area === 'excel' ? toShownAnswer(q, q.answer) : 'idk';
+    }
+    await api('POST', '/api/placement', { selfReport, answers: plAnswers });
+    await auditAll('placement-credited learner');
+    await open('#/learn/excel');
+    const placedRows = await b.evaluate(`[...document.querySelectorAll('.main .path-node')].filter((n) => n.querySelector('.node-icon.placed')).map((n) => ({ standing: [...n.querySelectorAll('[data-standing]')].map((x) => x.textContent.trim()), note: !!n.querySelector('.placed-note') }))`);
+    check('standing: every placement-credited topic on the path shows one standing (Not started) and says in words that the placement credited it',
+      placedRows.length > 0 && placedRows.every((r) => r.standing.join() === 'Not started' && r.note), JSON.stringify(placedRows.slice(0, 3)));
+    await open('#/progress');
+    await b.evaluate(`(() => { const d = document.querySelector('.main .every-topic'); if (d) d.open = true; })()`);
+    const placedTable = await b.evaluate(`[...document.querySelectorAll('.main .every-topic tbody tr')].filter((r) => r.querySelector('.placed-note')).map((r) => [...r.querySelectorAll('[data-standing]')].map((x) => x.textContent.trim()).join())`);
+    check('standing: in "Show every topic" the credited topics say so, beside their one standing', placedTable.length > 0 && placedTable.every((s) => s === 'Not started'), JSON.stringify(placedTable.slice(0, 4)));
+
+    // 2. a calibrating learner: a few checked answers
+    await api('POST', '/api/reset', { confirm: 'RESET' });
+    await onboard();
+    const quiz = Object.values(content.items).filter((it) => it.topicId === 'xl-basics' && it.source === 'quiz' && it.type === 'mc').slice(0, 5);
+    for (const it of quiz) await api('POST', `/api/items/${it.id}/submit`, { answer: toShownAnswer(it, it.answer), source: 'quiz' });
+    const phase = (await api('GET', '/api/home')).phase?.phase;
+    check('standing: the calibrating learner really is calibrating', phase === 'calibrating', phase);
+    await auditAll('calibrating learner');
+
+    // 3. the contradiction the architecture review found, written through the engine while the app is stopped
+    await api('POST', '/api/reset', { confirm: 'RESET' });
+    await stopServer();
+    assertTestDataDir(tmp, 'the standing scenario');
+    const store = await import('../server/store.js');
+    await store.openStore(tmp);
+    const engine = await import('../server/engine.js');
+    const mastery = await import('../server/mastery.js');
+    const { recordLearningButCompetent } = await import('./lib/standing-fixture.js');
+    const fx = recordLearningButCompetent({ content, engine, mastery, kindOf, metaOf });
+    store.flushNow();
+    startServer();
+    check('app comes back', await waitUp(), serverOut.slice(-400));
+    await onboard();
+    const fxTopic = await api('GET', `/api/topics/${fx.topicId}`);
+    check(`standing: the fixture topic's percent says "learning" internally while its Mastery stage is Competent (${fx.topicId}, ${fx.percent}%)`,
+      fxTopic.status === 'learning' && fxTopic.masteryStage === 'competent' && fxTopic.mastery === fx.percent, JSON.stringify({ status: fxTopic.status, masteryStage: fxTopic.masteryStage, mastery: fxTopic.mastery }));
+    await auditAll('Learning-but-Competent fixture', [['the fixture topic', `#/topic/${fx.topicId}`]]);
+    const standingIn = (sel) => b.evaluate(`(() => { const r = ${sel}; return r ? { standing: [...r.querySelectorAll('[data-standing]')].map((x) => x.textContent.trim()), text: r.innerText.replace(/\\s+/g, ' ') } : null; })()`);
+    await open(`#/learn/${fx.skill}`);
+    const row = await standingIn(`[...document.querySelectorAll('.main .path-node')].find((n) => n.innerText.includes(${JSON.stringify(content.topicMap[fx.topicId].title)}))`);
+    check('standing: on the learning path the fixture topic shows Competent, with its percent only as coverage',
+      row && row.standing.join() === 'Competent' && row.text.includes(`${fx.percent}% covered`) && !/\bLearning\b/.test(row.text), JSON.stringify(row));
+    await open('#/progress');
+    await b.evaluate(`(() => { const d = document.querySelector('.main .every-topic'); if (d) d.open = true; })()`); // as the learner opens it
+    await sleep(150);
+    const trow = await standingIn(`[...document.querySelectorAll('.main .every-topic tbody tr')].find((n) => n.innerText.includes(${JSON.stringify(content.topicMap[fx.topicId].title)}))`);
+    check('standing: in "Show every topic" the fixture topic shows Competent and never "Learning" beside it',
+      trow && trow.standing.join() === 'Competent' && trow.text.includes(`${fx.percent}% covered`) && !/\bLearning\b/.test(trow.text), JSON.stringify(trow));
+    await open(`#/topic/${fx.topicId}`);
+    const panel = await standingIn(`document.querySelector('.main .mastery-panel')`);
+    const head = await b.evaluate(`(document.querySelector('.main .page-head')?.innerText || '').replace(/\\s+/g, ' ')`);
+    check('standing: the topic page says Competent as its Mastery stage, the tier as the curriculum and the percent as covered',
+      panel && panel.standing.join() === 'Competent' && /Mastery stage/i.test(panel.text) && /(Beginner|Intermediate|Advanced) curriculum/.test(head) && head.includes(`${fx.percent}% covered`), JSON.stringify({ standing: panel?.standing, panel: panel?.text.slice(0, 80), head: head.slice(-120) }));
+
+    // the quiz list and the practice library name each topic's tier too: as the curriculum (Codex review)
+    const bareTier = async (hash) => {
+      await open(hash);
+      return b.evaluate(`[...document.querySelectorAll('.main .tiny, .main .small')].map((e) => e.textContent.trim())
+        .filter((t) => /^(Beginner|Intermediate|Advanced) · \\d+ q$/.test(t) || / · (Beginner|Intermediate|Advanced)( · Challenge)?$/.test(t))`);
+    };
+    const bare = [...await bareTier('#/quizzes'), ...await bareTier('#/practice')];
+    check('standing: the quiz list and the practice library label every topic tier as the curriculum', bare.length === 0, bare.slice(0, 3).join(' | '));
+
+    // 4. an established learner (the fixture used for manual testing: weeks of work in every skill)
+    await stopServer();
+    const fixture = spawnSync(process.execPath, ['tools/fixture.js', tmp, '--force'], { cwd: APP, encoding: 'utf8', timeout: 120000 });
+    check('standing: the established learner fixture was built', fixture.status === 0, (fixture.stderr || fixture.stdout).slice(-300));
+    startServer();
+    check('app comes back', await waitUp(), serverOut.slice(-400));
+    await auditAll('established learner', [['a topic', '#/topic/xl-xlookup']]);
+
+    // 5. optional: a COPY of real progress, inside the temporary folder (never the real file)
+    const seed = process.env.ACADEMY_UI_SEED_DB;
+    if (seed) {
+      assertTestDataDir(path.dirname(seed), 'the standing scenario (seed copy)');
+      await stopServer();
+      fs.copyFileSync(seed, path.join(tmp, 'academy.db'));
+      startServer();
+      check('app comes back', await waitUp(), serverOut.slice(-400));
+      await auditAll('copy of real progress', [['a topic', '#/topic/xl-xlookup']]);
+      const p = await api('GET', '/api/progress');
+      console.log('      real-copy Progress, skill by skill: ' + p.skills.map((s) => `${s.name}: ${s.masteryStageLabel} · curriculum ${s.tierStage} · ${s.progress}% covered`).join(' | '));
+    }
   },
 
   // ------------------------------------------------------------ the placement check (runs last: it resets progress)

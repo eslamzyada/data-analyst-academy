@@ -198,7 +198,7 @@ export default function Onboarding({ onDone }: { onDone: () => void }) {
     return wrap(
       <div className="stack">
         <div className="row between">
-          <b>Step 2 of 2 · {q.areaName}: {q.stageWords}</b>
+          <b>Step 2 of 2 · {q.areaName}: {q.placementStageWords}</b>
           <span className="muted small">Question {pos + 1}</span>
         </div>
         <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>

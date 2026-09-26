@@ -55,7 +55,7 @@ export default function Today() {
           <h1 style={{ marginTop: 6 }}>Today's plan</h1>
           <p>{plan.reason}</p>
         </div>
-        <div className="row"><SkillTag skill={plan.skill} name={plan.skillName} /><span className="badge">{plan.level}</span><b>{plan.topicTitle}</b></div>
+        <div className="row"><SkillTag skill={plan.skill} name={plan.skillName} /><span className="badge">{plan.level} curriculum</span><b>{plan.topicTitle}</b></div>
       </div>
       <div className="card tint" style={{ marginBottom: 16 }}>
         <div className="row between">

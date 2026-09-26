@@ -424,6 +424,23 @@ section('cold start: a brand-new learner');
   ok(qs.filter((q) => (q.difficulty || 2) > 2).length / qs.length < 0.1, 'a first Power BI quiz stays introductory (DAX and Import-vs-DirectQuery wait)');
 }
 
+// ================================================================ learner standing: two measures, one word on screen
+// The percent (coverage) and the Mastery stage follow different rules, so their words can disagree:
+// the pages must show only the Mastery stage as standing (tools/test-ui.js "standing" checks that).
+// This proves the disagreement is real on the fixture the browser test uses, and that fixing the
+// pages changed neither measure.
+section('learner standing: the percent word and the Mastery stage can disagree');
+{
+  reset();
+  const { recordLearningButCompetent } = await import('./lib/standing-fixture.js');
+  const fx = recordLearningButCompetent({ content, engine, mastery, kindOf, metaOf });
+  ok(fx.status === 'learning' && fx.percent < 50, `on the fixture the old percent status would say "Learning" (${fx.topicId}, ${fx.percent}% covered)`, JSON.stringify(fx));
+  ok(fx.stage === 'competent', 'and the Mastery stage says Competent (ideas and hands-on skill shown, business use not yet)', JSON.stringify(fx));
+  // the underlying rules are untouched: same thresholds as before this change
+  ok(engine.topicStatus(content.topicMap[fx.topicId]).mastery === fx.percent && mastery.STAGES.join() === 'introduced,learning,practicing,competent,independent,strong',
+    'the percent and the six stages are computed exactly as before (presentation-only change)');
+}
+
 store.flushNow();
 fs.rmSync(dir, { recursive: true, force: true });
 console.log(`\n${pass}/${pass + failures.length} checks passed.`);

@@ -21,12 +21,12 @@ export default function Settings() {
         <a className="btn" href="/api/backup"><Icon name="download" size={15} />Download backup</a>
       </div>
       <div className="card">
-        <h3>How the app decides your level</h3>
+        <h3>How your progress is measured</h3>
         <ul className="small muted" style={{ paddingLeft: 18 }}>
-          <li>Each topic's progress comes from your recent answers. Practice tasks and challenges count more than quiz questions.</li>
-          <li>Quiz answers alone can't take a topic past 60%, and it can't pass 85% without a solved challenge, project step or exam.</li>
+          <li><b>Mastery stage</b> (Introduced → Learning → Practicing → Competent → Independent → Strong) says what you can actually do. It comes from the kinds of work you have shown, and it is the only word the app uses for how good you are at something.</li>
+          <li><b>Curriculum</b> (Beginner, Intermediate, Advanced) is where you are on the learning path, not how good you are.</li>
+          <li><b>Covered (%)</b> is how much of a topic your recent graded work covers. Practice tasks and challenges count more than quiz questions; quiz answers alone can't take a topic past 60%, and it can't pass 85% without a solved challenge, project step or exam.</li>
           <li>Hints reduce the credit a little; showing the full answer means that attempt doesn't count.</li>
-          <li>"Mastered" also needs the topic to survive spaced reviews over several days.</li>
           <li>Topics you've learned come back after 1, 3, 7, 14 and 30 days. A wrong review sends them back to the start.</li>
         </ul>
       </div>
